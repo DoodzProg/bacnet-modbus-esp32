@@ -1,0 +1,11 @@
+# Dossiers générés par PlatformIO et VS Code
+.pio/
+.vscode/
+
+# Fichiers de configuration sensibles
+include/secrets.h
+
+# Fichiers binaires de build
+*.bin
+*.elf
+*.map

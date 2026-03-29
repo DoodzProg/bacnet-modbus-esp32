@@ -1,0 +1,29 @@
+{
+  "name": "bacnet",
+  "version": "1.0.0",
+  "description": "Custom build configuration for BACnet-stack. Filters out unused objects (gateway, client, bsc, etc.) to drastically save RAM and flash memory on the ESP32.",
+  "build": {
+    "srcFilter": [
+      "+<*.c>",
+      "+<basic/service/*.c>",
+      "+<basic/binding/*.c>",
+      "+<basic/tsm/*.c>",
+      "+<basic/sys/*.c>",
+      "+<basic/npdu/*.c>",
+      "+<datalink/bvlc.c>",
+      "+<datalink/crc.c>",
+      "+<datalink/bip-esp32.c>",
+      "+<basic/object/av.c>",
+      "+<basic/object/bv.c>",
+      "-<basic/object/client/>",
+      "-<basic/object/gateway/>",
+      "-<basic/program/>",
+      "-<basic/ucix/>",
+      "-<datalink/bsc/>"
+    ],
+    "flags": [
+      "-I.",
+      "-I.."
+    ]
+  }
+}
