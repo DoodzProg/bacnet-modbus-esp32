@@ -1,0 +1,79 @@
+<!-- ==============================================================================
+  @file index.html
+  @brief Main entry point for the BMS Gateway Web Interface.
+  @details Responsive layout containing the top navigation bar, telemetry dashboard,
+  and hidden modal structures for network configuration. Designed for LittleFS.
+  @author [Your Name / Project Name]
+  @date 2024
+============================================================================== -->
+
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BMS Gateway</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="top-bar">
+        
+        <div class="top-left">
+            <div class="top-bar-title">Web View - BMS Gateway Supervision</div>
+            <div class="sys-badges">
+                <span class="badge" id="ramBadge" title="Real-time SRAM Usage">RAM: --%</span>
+                <span class="badge status-online"><span class="pulse"></span> ONLINE</span>
+            </div>
+        </div>
+
+        <div class="top-right">
+            <div class="ip-block">
+                <span class="copy-hover" title="Click to copy IP" onclick="copyIp(this, 'clientIpSpan')">Client IP: <b id="clientIpSpan">...</b></span>
+                <span class="copy-hover" title="Click to copy IP" onclick="copyIp(this, 'espIpSpan')">Device IP: <b id="espIpSpan">...</b></span>
+            </div>
+
+            <div class="protocols">
+                <span class="copy-hover" title="Click to copy Port" onclick="copyPort(this, '502')">Modbus TCP: 502</span>
+                <span class="copy-hover" title="Click to copy Port" onclick="copyPort(this, '47808')">BACnet/IP: 47808</span>
+            </div>
+
+            <button id="networkBtn" class="btn btn-action" style="display:none;" onclick="openModal()">
+                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M5 12.55a11 11 0 0 1 14.08 0"></path>
+                    <path d="M1.42 9a16 16 0 0 1 21.16 0"></path>
+                    <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+                    <line x1="12" y1="20" x2="12.01" y2="20"></line>
+                </svg>
+                <span id="networkBtnText">Network Config...</span>
+            </button>
+            
+            <button id="themeToggle" class="theme-btn" title="Toggle Theme"></button>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="telemetry-panel">
+            <div class="panel-header">PROCESS TELEMETRY (READ-ONLY)</div>
+            
+            <div class="dashboard" id="dashboard">
+                </div>
+            
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="netModal">
+        <div class="modal-box">
+            <div class="modal-title" id="modalTitle">Network Configuration</div>
+            <div class="modal-body" id="modalBody">
+                </div>
+            <div class="modal-actions" id="modalActions">
+                <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-confirm" id="modalConfirmBtn">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

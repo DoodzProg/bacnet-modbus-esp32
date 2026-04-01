@@ -19,3 +19,12 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+--------------------------------------------------------------------------------
+THIRD-PARTY LICENSES
+
+This project includes components from the BACnet-stack open-source project
+(https://github.com/bacnet-stack/bacnet-stack), created by Steve Karg.
+The BACnet-stack code located in the `lib/bacnet/` directory is licensed under 
+the GNU General Public License (GPL) version 2 or later, with a special exception 
+that allows linking with proprietary/other open source code.

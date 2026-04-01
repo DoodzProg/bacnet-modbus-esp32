@@ -1,3 +1,12 @@
+/**
+ * @file bacnet_handler.cpp
+ * @brief BACnet/IP protocol handler and dynamic binding implementation.
+ * @details Integrates the pure C BACnet stack, handles UDP socket routing, 
+ * maps internal state to BACnet objects, and intercepts write properties.
+ * @author [Your Name / Project Name]
+ * @date 2024
+ */
+
 #include "bacnet_handler.h"
 #include "config.h"
 #include "state.h"
@@ -9,17 +18,25 @@
   #include "modbus_handler.h"
 #endif
 
-// ============================================================
-// SERVER INSTANCES
-// ============================================================
+// ==============================================================================
+// SERVER INSTANCES & UDP WRAPPERS
+// ==============================================================================
+
 WiFiUDP bacnetUDP;          
 bool    udpStarted = false; 
+IPAddress current_bacnet_ip;
 
+/**
+ * @brief Helper to retrieve the local IP in standard 32-bit format.
+ */
 static uint32_t _get_local_ip() {
-    IPAddress ip = WiFi.localIP(); 
-    return (uint32_t)ip[0] | ((uint32_t)ip[1] << 8) | ((uint32_t)ip[2] << 16) | ((uint32_t)ip[3] << 24);
+    return (uint32_t)current_bacnet_ip[0] | ((uint32_t)current_bacnet_ip[1] << 8) | 
+           ((uint32_t)current_bacnet_ip[2] << 16) | ((uint32_t)current_bacnet_ip[3] << 24);
 }
 
+/**
+ * @brief Helper to send UDP packets for the BACnet C stack.
+ */
 static int _udp_send(uint32_t dest_ip, uint16_t dest_port, uint8_t* data, uint16_t len) {
     if (!udpStarted) { bacnetUDP.begin(BACNET_PORT); udpStarted = true; }
     IPAddress ip(dest_ip & 0xFF, (dest_ip >> 8) & 0xFF, (dest_ip >> 16) & 0xFF, (dest_ip >> 24) & 0xFF);
@@ -28,6 +45,9 @@ static int _udp_send(uint32_t dest_ip, uint16_t dest_port, uint8_t* data, uint16
     return bacnetUDP.endPacket() ? len : -1;
 }
 
+/**
+ * @brief Helper to receive UDP packets for the BACnet C stack.
+ */
 static int _udp_recv(uint32_t* src_ip, uint16_t* src_port, uint8_t* buf, uint16_t max_len) {
     if (!udpStarted) { bacnetUDP.begin(BACNET_PORT); udpStarted = true; }
     int len = bacnetUDP.parsePacket();
@@ -40,15 +60,17 @@ static int _udp_recv(uint32_t* src_ip, uint16_t* src_port, uint8_t* buf, uint16_
     return bacnetUDP.read(buf, len);
 }
 
+// Map native ESP32 UDP functions to the BACnet stack expectations
 extern "C" {
-    uint32_t esp32_get_local_ip(void)                                { return _get_local_ip(); }
-    int esp32_udp_send(uint32_t d, uint16_t p, uint8_t* b, uint16_t l) { return _udp_send(d, p, b, l); }
+    uint32_t esp32_get_local_ip(void)                                    { return _get_local_ip(); }
+    int esp32_udp_send(uint32_t d, uint16_t p, uint8_t* b, uint16_t l)   { return _udp_send(d, p, b, l); }
     int esp32_udp_recv(uint32_t* i, uint16_t* p, uint8_t* b, uint16_t l) { return _udp_recv(i, p, b, l); }
 }
 
-// ============================================================
+// ==============================================================================
 // BACNET STACK INCLUDES (Pure C)
-// ============================================================
+// ==============================================================================
+
 extern "C" {
     #include "bacnet/bacdef.h"
     #include "bacnet/bacstr.h"
@@ -76,6 +98,10 @@ extern "C" {
 #define MAX_MPDU MAX_APDU 
 #endif
 uint8_t Handler_Transmit_Buffer[MAX_MPDU];
+
+// ==============================================================================
+// DEVICE OBJECT OVERRIDES
+// ==============================================================================
 
 extern "C" {
     uint32_t Device_Object_Instance_Number(void) { return BACNET_DEVICE_ID; }
@@ -124,7 +150,7 @@ extern "C" {
             rpdata->application_data_len = apdu_len; return apdu_len;
         }
         if (rpdata->object_property == PROP_OBJECT_NAME) {
-            // FIX: 'static' prevents stack overflow for large BACnet string structures!
+            // FIX: 'static' prevents stack overflow for large BACnet string structures
             static BACNET_CHARACTER_STRING name; 
             characterstring_init_ansi(&name, BACNET_DEVICE_NAME);
             rpdata->application_data_len = encode_application_character_string(rpdata->application_data, &name);
@@ -145,9 +171,10 @@ extern "C" {
         return BACNET_STATUS_ERROR;
     }
 
-    // ============================================================
-    // THE ULTIMATE INTERCEPTOR (DIAGNOSTIC MODE)
-    // ============================================================
+    // ==============================================================================
+    // PROPERTY WRITE HANDLER (INTERCEPTOR)
+    // ==============================================================================
+    
     bool Device_Write_Property(BACNET_WRITE_PROPERTY_DATA* wp_data) {
         Serial.println("\n====================================");
         Serial.println("[BACNET] WRITE REQUEST INTERCEPTED!");
@@ -160,7 +187,7 @@ extern "C" {
         if (wp_data->object_property == PROP_PRESENT_VALUE) {
             Serial.println("[BACNET] Attempting to write Present_Value...");
             
-            // FIX: 'static' moves this huge struct to global RAM
+            // FIX: 'static' moves this large struct to global RAM to prevent crash
             static BACNET_APPLICATION_DATA_VALUE value;
             
             int decode_len = bacapp_decode_application_data(wp_data->application_data, wp_data->application_data_len, &value);
@@ -209,7 +236,7 @@ extern "C" {
                     for (int i = 0; i < NUM_BINARY_POINTS; i++) {
                         if (binaryPoints[i].bac_instance == wp_data->object_instance) {
                             
-                            // LA CORRECTION EST ICI !
+                            // Apply correction here: Update the global state
                             binaryPoints[i].value = new_val; 
                             
                             #ifdef ENABLE_MODBUS
@@ -242,12 +269,20 @@ extern "C" {
     bool Binary_Value_Name_Set(uint32_t object_instance, const char *new_name);
 }
 
-void bacnet_init() {
+// ==============================================================================
+// INITIALIZATION & TASK LOOP
+// ==============================================================================
+
+void bacnet_init(IPAddress ip) {
+    current_bacnet_ip = ip;
+    
+    // 1. Basic Device configuration
     Device_Set_Object_Instance_Number(BACNET_DEVICE_ID);
     BACNET_CHARACTER_STRING bacnet_name;
     characterstring_init_ansi(&bacnet_name, BACNET_DEVICE_NAME);
     Device_Set_Object_Name(&bacnet_name);
 
+    // 2. Dynamic Object Creation
     for (int i = 0; i < NUM_ANALOG_POINTS; i++) {
         Analog_Value_Create(analogPoints[i].bac_instance);
         Analog_Value_Name_Set(analogPoints[i].bac_instance, analogPoints[i].name);
@@ -257,13 +292,15 @@ void bacnet_init() {
         Binary_Value_Name_Set(binaryPoints[i].bac_instance, binaryPoints[i].name);
     }
 
+    // 3. Service Handlers Registration
     apdu_set_unconfirmed_handler(SERVICE_UNCONFIRMED_WHO_IS, handler_who_is);
     apdu_set_confirmed_handler(SERVICE_CONFIRMED_READ_PROPERTY, handler_read_property);
     apdu_set_confirmed_handler(SERVICE_CONFIRMED_WRITE_PROPERTY, handler_write_property);
 
+    // 4. Network Binding (Dynamic IP)
     bip_set_port(BACNET_PORT);
-    BACNET_IP_ADDRESS local_addr = {0};
-    IPAddress ip = WiFi.localIP();
+    
+    BACNET_IP_ADDRESS local_addr = {0}; 
     local_addr.address[0] = ip[0];
     local_addr.address[1] = ip[1];
     local_addr.address[2] = ip[2];
@@ -271,12 +308,21 @@ void bacnet_init() {
     local_addr.port = BACNET_PORT;
     
     bip_set_addr(&local_addr);
-    bip_set_subnet_prefix(24);
-    bip_init(NULL);
+    bip_set_subnet_prefix(24); // Standard Subnet Mask (255.255.255.0)
+    
+    if (!bip_init(NULL)) {
+        Serial.println("[BACNET] ERROR: Failed to initialize BIP stack!");
+        return;
+    }
+
+    // 5. Announce presence on the network
     Send_I_Am(&Handler_Transmit_Buffer[0]);
+    Serial.print("[BACNET] Stack bound to IP: ");
+    Serial.println(ip);
 }
 
 void bacnet_update_objects() {
+    // Keep internal values synchronized with BACnet objects
     for (int i = 0; i < NUM_BINARY_POINTS; i++) {
         BACNET_BINARY_PV bv = binaryPoints[i].value ? BINARY_ACTIVE : BINARY_INACTIVE;
         Binary_Value_Present_Value_Set(binaryPoints[i].bac_instance, bv);
@@ -293,8 +339,8 @@ void bacnet_task() {
     uint16_t pdu_len = bip_receive(&src, pdu, MAX_APDU, 0);
     if (pdu_len > 0) {
         #ifdef ENABLE_MODBUS
-        extern ModbusIP mb;  // Permet d'appeler mb.task() ici
-        mb.task();           // Garde la connexion Modbus vivante pendant le traitement BACnet
+        extern ModbusIP mb;  // Expose Modbus instance to allow calling mb.task() directly
+        mb.task();           // Keeps Modbus connection alive during intensive BACnet processing
         #endif
         npdu_handler(&src, pdu, pdu_len);
     }

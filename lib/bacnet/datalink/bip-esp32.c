@@ -1,7 +1,10 @@
 /**
- * Custom BACnet/IP (BIP) Datalink Layer for ESP32
- * * This file acts as a bridge between the standard C BACnet-stack 
+ * @file bip-esp32.c
+ * @brief Custom BACnet/IP (BIP) Datalink Layer for ESP32.
+ * @details Acts as a routing bridge between the standard C BACnet-stack 
  * and the ESP32's hardware-specific WiFiUDP C++ library.
+ * @author [Your Name / Project Name]
+ * @date 2024
  */
 
 #include <stdint.h>
@@ -12,10 +15,11 @@
 #include "bacnet/bacenum.h"
 #include "bacnet/datalink/bip.h"
 
-// ============================================================
+// ==============================================================================
 // C++ BRIDGE EXTERN POINTERS
-// ============================================================
-// These functions are implemented in the Arduino C++ environment (main.cpp)
+// ==============================================================================
+
+// These functions are implemented in the Arduino C++ environment (bacnet_handler.cpp)
 // and are called from this pure C file via extern pointers.
 extern int esp32_udp_send(uint32_t dest_ip, uint16_t dest_port,
                            uint8_t* data, uint16_t len);
@@ -23,16 +27,18 @@ extern int esp32_udp_recv(uint32_t* src_ip, uint16_t* src_port,
                            uint8_t* buf, uint16_t max_len);
 extern uint32_t esp32_get_local_ip(void);
 
-// ============================================================
+// ==============================================================================
 // GLOBAL VARIABLES
-// ============================================================
+// ==============================================================================
+
 static uint16_t BIP_Port = 0xBAC0; // Default BACnet port (47808)
 static uint32_t BIP_Address = 0;   // Local IP address in uint32 format
 static bool BIP_Initialized = false;
 
-// ============================================================
+// ==============================================================================
 // DATALINK INITIALIZATION
-// ============================================================
+// ==============================================================================
+
 bool bip_init(char* ifname) {
     (void)ifname; // Network interface name is not used on ESP32
     BIP_Address = esp32_get_local_ip();
@@ -73,9 +79,10 @@ bool bip_get_addr(BACNET_IP_ADDRESS *addr) {
     return false;
 }
 
-// ============================================================
+// ==============================================================================
 // TRANSMISSION (SEND)
-// ============================================================
+// ==============================================================================
+
 int bip_send_pdu(BACNET_ADDRESS* dest,
                  BACNET_NPDU_DATA* npdu_data,
                  uint8_t* pdu,
@@ -109,18 +116,13 @@ int bip_send_pdu(BACNET_ADDRESS* dest,
     // 4. Send via C++ UDP Bridge
     int result = esp32_udp_send(dest_ip, dest_port, buf, offset);
 
-    // Debugging output for packet tracing
-    /*printf("bip_send_pdu: dest=%u.%u.%u.%u:%u len=%d result=%d\n",
-        dest_ip & 0xFF, (dest_ip>>8)&0xFF,
-        (dest_ip>>16)&0xFF, (dest_ip>>24)&0xFF,
-        dest_port, offset, result);
-    */
     return result;
 }
 
-// ============================================================
+// ==============================================================================
 // RECEPTION (RECEIVE)
-// ============================================================
+// ==============================================================================
+
 uint16_t bip_receive(BACNET_ADDRESS* src,
                      uint8_t* pdu,
                      uint16_t max_pdu,
@@ -167,7 +169,7 @@ uint16_t bip_receive(BACNET_ADDRESS* src,
 
     // 6. Populate the source address structure for the application layer
     src->mac_len = 6;
-    memcpy(src->mac, &src_ip, 4);        // Sender's IP
+    memcpy(src->mac, &src_ip, 4);         // Sender's IP
     src->mac[4] = (src_port >> 8) & 0xFF; // Sender's Port MSB
     src->mac[5] = src_port & 0xFF;        // Sender's Port LSB
     src->net = 0;                         // Local network
@@ -176,9 +178,10 @@ uint16_t bip_receive(BACNET_ADDRESS* src,
     return pdu_len;
 }
 
-// ============================================================
+// ==============================================================================
 // ADDRESS MANAGEMENT
-// ============================================================
+// ==============================================================================
+
 void bip_get_broadcast_address(BACNET_ADDRESS* dest) {
     uint32_t broadcast = BIP_Address | 0xFF;
     dest->mac_len = 6;
@@ -216,9 +219,10 @@ bool bip_set_subnet_prefix(uint8_t prefix) {
     return true;
 }
 
-// ============================================================
+// ==============================================================================
 // SYSTEM TIME STUB
-// ============================================================
+// ==============================================================================
+
 unsigned long mstimer_now(void) {
     // Links to the Arduino millis() function
     extern unsigned long millis(void);

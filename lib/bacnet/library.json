@@ -1,7 +1,36 @@
 {
-  "name": "bacnet",
+  "name": "bacnet-stack",
   "version": "1.0.0",
   "description": "Custom build configuration for BACnet-stack. Filters out unused objects (gateway, client, bsc, etc.) to drastically save RAM and flash memory on the ESP32.",
+  "keywords": [
+    "bacnet",
+    "ip",
+    "bms",
+    "automation"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bacnet-stack/bacnet-stack.git"
+  },
+  "authors": [
+    {
+      "name": "Steve Karg",
+      "maintainer": false
+    },
+    {
+      "name": "Doodz",
+      "email": "doodz.contact@gmail.com",
+      "maintainer": true
+    }
+  ],
+  "license": "GPL-2.0-or-later",
+  "frameworks": [
+    "arduino",
+    "espidf"
+  ],
+  "platforms": [
+    "espressif32"
+  ],
   "build": {
     "srcFilter": [
       "+<*.c>",

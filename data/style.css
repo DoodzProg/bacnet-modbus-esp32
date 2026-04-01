@@ -1,0 +1,167 @@
+/**
+ * ==============================================================================
+ * @file style.css
+ * @brief Flat 2D Industrial styling for the BMS Gateway.
+ * @details Implements a responsive grid, CSS variables for dynamic light/dark 
+ * themes, hardware-accelerated transitions, and interactive hover states.
+ * @author [Your Name / Project Name]
+ * @date 2024
+ * ==============================================================================
+ */
+
+/* ==============================================================================
+   THEME VARIABLES (LIGHT/DARK MODE)
+   ============================================================================== */
+:root[data-theme="light"] {
+    --bg-body: #e4e5e6; --bg-panel: #f4f5f6; --bg-card: #ffffff; --bg-screen: #f8f9fa;
+    --text-main: #2b2b2b; --text-dim: #6c757d;
+    --color-run: #2e7d32; --color-stop: #c62828; --color-bar: #00838f; --color-temp: #ef6c00;
+    --border-color: #ced4da; 
+}
+
+:root[data-theme="dark"] {
+    --bg-body: #121212; --bg-panel: #1e1e1e; --bg-card: #2a2a2a; --bg-screen: #1c1c1c; 
+    --text-main: #e0e0e0; --text-dim: #888888;
+    --color-run: #4caf50; --color-stop: #f44336; --color-bar: #00bcd4; --color-temp: #ff9800;  
+    --border-color: #3e3e3e; 
+}
+
+/* ==============================================================================
+   GLOBAL LAYOUT & TYPOGRAPHY
+   ============================================================================== */
+body { 
+    background-color: var(--bg-body); 
+    color: var(--text-main); 
+    font-family: 'Segoe UI', Arial, sans-serif; 
+    margin: 0; padding: 0; 
+    transition: all 0.3s ease; 
+}
+
+/* ==============================================================================
+   TOP NAVIGATION BAR
+   ============================================================================== */
+.top-bar { 
+    border-bottom: 1px solid var(--border-color); 
+    background-color: var(--bg-panel); 
+    padding: 16px 24px; 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    flex-wrap: wrap; 
+    gap: 16px; 
+}
+
+.top-left { display: flex; flex-direction: column; gap: 8px; }
+.top-bar-title { font-size: 16px; font-weight: 700; color: var(--text-main); letter-spacing: 1px; text-transform: uppercase; }
+
+/* System Badges (Hardware Specs & RAM) */
+.sys-badges { display: flex; gap: 8px; font-size: 10px; color: var(--text-dim); font-weight: bold; }
+.badge { background: var(--bg-body); padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 6px; letter-spacing: 0.5px;}
+.pulse { width: 6px; height: 6px; background-color: var(--color-run); border-radius: 50%; animation: blink 1.5s infinite; }
+@keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+
+.top-right { display: flex; align-items: center; gap: 20px; }
+
+/* Stacked Information Blocks (IPs & Protocols) */
+.ip-block, .protocols { 
+    display: flex; 
+    flex-direction: column; 
+    gap: 6px; 
+    font-size: 13px; 
+    font-weight: 500;
+}
+
+.ip-block span, .protocols span { 
+    background: var(--bg-body); 
+    padding: 6px 10px; 
+    border: 1px solid var(--border-color); 
+    border-radius: 4px;
+    cursor: pointer; 
+    user-select: none; 
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between;
+    min-width: 140px;
+    color: var(--text-dim);
+}
+
+/* Interactive Hover & Click Animations */
+.copy-hover {
+    transition: transform 0.1s ease, border-color 0.2s ease, color 0.2s ease !important;
+}
+.copy-hover:hover {
+    border-color: var(--color-bar) !important; 
+    color: var(--text-main) !important;
+}
+.copy-hover:active {
+    transform: scale(0.95);
+}
+
+.ip-block span b { color: var(--color-bar); font-weight: 700; }
+.protocols span { justify-content: center; }
+
+/* ==============================================================================
+   BUTTONS & CONTROLS
+   ============================================================================== */
+.btn { padding: 8px 14px; border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; transition: all 0.2s ease; display: flex; align-items: center; gap: 8px;}
+.btn-action { background-color: var(--bg-body); color: var(--text-main); }
+.btn-action:hover { border-color: var(--color-temp); color: var(--color-temp); }
+.btn-confirm { background-color: var(--color-bar); color: #fff; border: none; padding: 10px 20px; }
+.btn-cancel { background-color: var(--bg-panel); color: var(--text-main); padding: 10px 20px; }
+
+.theme-btn { background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-color); padding: 8px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.theme-btn:hover { background: var(--border-color); }
+
+/* ==============================================================================
+   DASHBOARD PANELS & TELEMETRY CARDS
+   ============================================================================== */
+.main-content { padding: 32px 24px; max-width: 1200px; margin: 0 auto; }
+.telemetry-panel { background-color: var(--bg-panel); border: 1px solid var(--border-color); padding: 24px; border-radius: 6px; }
+.panel-header { font-size: 14px; font-weight: 700; color: var(--text-dim); margin-bottom: 24px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color); letter-spacing: 1.5px; }
+.dashboard { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 24px; }
+
+/* Flat Card Design */
+.card { background-color: var(--bg-card); border: 1px solid var(--border-color); padding: 20px; border-radius: 6px; display: flex; flex-direction: column; }
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.card-label { font-size: 13px; color: var(--text-main); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;}
+.badge-ro { font-size: 10px; font-weight: bold; color: var(--text-dim); border: 1px solid var(--border-color); padding: 2px 6px; border-radius: 4px; }
+
+.value-display { 
+    background-color: var(--bg-screen); 
+    border: 1px solid var(--border-color); 
+    border-radius: 6px;
+    padding: 16px; 
+    min-height: 50px; 
+}
+
+.value-wrapper { display: flex; justify-content: space-between; align-items: center; }
+.value-text { font-size: 32px; font-weight: 300; display: flex; align-items: center; color: var(--text-main); }
+.unit { font-size: 16px; color: var(--text-dim); margin-left: 8px; font-weight: 600; }
+
+.indicator-square { width: 16px; height: 16px; margin-right: 12px; border-radius: 4px; }
+.state-run { background-color: var(--color-run); } 
+.state-stop { background-color: var(--color-stop); }
+
+/* ==============================================================================
+   GAUGES & THERMOMETERS (Flat 2D rendering)
+   ============================================================================== */
+.gauge-container { width: 100%; height: 12px; background-color: var(--border-color); margin-top: 16px; clip-path: polygon(0 100%, 100% 100%, 100% 0); }
+.gauge-fill { height: 100%; background-color: var(--color-bar); transition: width 0.3s ease; }
+
+.thermo-vertical { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 42px; margin-left: 10px; }
+.thermo-tube-v { width: 8px; height: 100%; background-color: var(--border-color); border-radius: 4px 4px 0 0; display: flex; flex-direction: column; justify-content: flex-end; z-index: 1; }
+.thermo-fill-v { width: 100%; background-color: var(--color-temp); border-radius: 4px 4px 0 0; transition: height 0.3s ease; }
+.thermo-bulb-v { width: 18px; height: 18px; background-color: var(--color-temp); border-radius: 50%; margin-top: -4px; z-index: 2; }
+
+/* ==============================================================================
+   MODAL (POP-UP) FOR NETWORK CONFIGURATION
+   ============================================================================== */
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: none; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(3px);}
+.modal-box { background: var(--bg-card); border: 1px solid var(--border-color); padding: 32px; max-width: 500px; width: 90%; border-radius: 6px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+.modal-title { font-size: 18px; font-weight: bold; color: var(--text-main); margin-bottom: 20px; text-transform: uppercase; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; }
+.modal-body { font-size: 14px; color: var(--text-dim); margin-bottom: 28px; line-height: 1.6; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 12px; }
+
+.warning-text { color: var(--color-temp); font-weight: 600; margin-top: 15px; display: block;}
+.input-row { display: flex; gap: 10px; margin-top: 10px; align-items: center;}
+.input-field { flex: 1; padding: 10px; background-color: var(--bg-screen); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px; font-family: inherit; font-size: 14px; }
