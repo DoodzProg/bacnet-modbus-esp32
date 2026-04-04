@@ -1,18 +1,21 @@
 /**
- * @file main.cpp
- * @brief Main entry point for the BMS Gateway (Modbus/BACnet).
- * @details Handles the main loop, Wi-Fi initialization (persistent AP/STA), 
+ * @file        main.cpp
+ * @brief       Main entry point for the Dynamic BMS Gateway.
+ * @details     Handles the main loop, Wi-Fi initialization (persistent AP/STA), 
  * mDNS routing, and launches the tasks for the different protocols.
- * @author [Your Name / Project Name]
- * @date 2024
+ * Important: State loading via JSON must occur before protocol initialization.
+ * @author      Doodz (DoodzProg)
+ * @date        2026-04-04
+ * @version     1.0.0
+ * @repository  https://github.com/DoodzProg/ESP32-BMS-Gateway-Multi-Protocol
  */
 
 #include <Arduino.h>
 #include <WiFi.h>
 #include <ESPmDNS.h>      // Local DNS resolution (bms-gateway.local)
-#include <Preferences.h>  // Non-volatile memory (NVRAM) for the "Force AP" flag
+#include <Preferences.h>  // Non-volatile memory (NVRAM) for network configuration
 #include "secrets.h"
-#include "config.h"
+#include "config.h"       // Keep this for hardware defines like LED_PIN
 #include "state.h"
 
 // Conditional includes based on platformio.ini flags
@@ -35,6 +38,9 @@
 // AP Fallback credentials (Global variables mapping to extern definitions)
 const char* AP_SSID = "BMS-Gateway-Config";
 const char* AP_PASS = "admin1234";
+
+// Reboot flag triggered safely outside of async web server callbacks
+extern volatile bool pendingReboot;
 
 // ==============================================================================
 // MAIN ARDUINO SETUP
@@ -105,15 +111,20 @@ void setup() {
 
     Serial.println("=================================\n");
 
-    // 4. Initialize Enabled Protocol Modules
-#ifdef ENABLE_MODBUS
-    modbus_init();
-    Serial.println("Modbus TCP ready.");
+    // 4. CORE BOOT SEQUENCE - STRICT ORDER REQUIRED
+    // The Web Server MUST initialize first because it mounts LittleFS
+    // and loads the dynamic JSON configuration (state_load_from_json).
+#ifdef ENABLE_WEB
+    Serial.println("[SYSTEM] Mounting LittleFS and loading dynamic JSON config...");
+    web_server_init();
+    Serial.println("[SYSTEM] Web Server & Dynamic State ready.");
 #endif
 
-#ifdef ENABLE_WEB
-    web_server_init();
-    Serial.println("Web Server ready.");
+    // 5. PROTOCOL BOOT SEQUENCE
+    // Now that variables are loaded in RAM, we can expose them to the buses.
+#ifdef ENABLE_MODBUS
+    modbus_init();
+    Serial.println("[SYSTEM] Modbus TCP ready.");
 #endif
 
 #ifdef ENABLE_BACNET
@@ -129,7 +140,7 @@ void setup() {
     }
     
     bacnet_init(bacnet_bind_ip);
-    Serial.println("BACnet/IP ready.");
+    Serial.println("[SYSTEM] BACnet/IP ready.");
 #endif
 }
 
@@ -159,9 +170,16 @@ void loop() {
     bacnet_update_objects();
 #endif
 
-    // 3. Hardware Feedback (Status LED based on first binary point)
+    // 3. Hardware Feedback (Status LED based on first binary point if it exists)
     if (NUM_BINARY_POINTS > 0) {
         // Assuming LOW triggers the LED on this specific board
         digitalWrite(LED_PIN, binaryPoints[0].value ? LOW : HIGH);
+    }
+
+    // 4. Safe Reboot Handling (Triggered by Web UI modifications)
+    if (pendingReboot) {
+        Serial.println("\n[SYSTEM] Configuration changed by Web UI. Executing Safe Reboot...");
+        delay(500); // Give the TCP socket a moment to flush the 200 OK response
+        ESP.restart();
     }
 }

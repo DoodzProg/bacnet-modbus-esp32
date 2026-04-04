@@ -1,9 +1,11 @@
 /**
- * @file web_handler.h
- * @brief Embedded Web Server and REST API declarations.
- * @details Handles the user interface, Wi-Fi scanning, and persistent network configuration via LittleFS.
- * @author [Your Name / Project Name]
- * @date 2024
+ * @file        web_handler.h
+ * @brief       Embedded Web Server and REST API declarations.
+ * @details     Handles the user interface, Wi-Fi scanning, and persistent network configuration via LittleFS.
+ * @author      Doodz (DoodzProg)
+ * @date        2026-04-04
+ * @version     1.0.0
+ * @repository  https://github.com/DoodzProg/ESP32-BMS-Gateway-Multi-Protocol
  */
 
 #pragma once

@@ -9,3 +9,5 @@ include/secrets.h
 *.bin
 *.elf
 *.map
+!docs/*.bin
+!docs/*.json
