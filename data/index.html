@@ -1,10 +1,29 @@
 <!-- ==============================================================================
-  @file index.html
-  @brief Main entry point for the BMS Gateway Web Interface.
-  @details Responsive layout containing the top navigation bar, telemetry dashboard,
-  and hidden modal structures for network configuration. Designed for LittleFS.
-  @author [Your Name / Project Name]
-  @date 2024
+  @file        index.html
+  @brief       Main entry point for the BMS Gateway Web Interface.
+  @details     Full-featured SPA layout supporting:
+               - Real-time telemetry dashboard with live value polling.
+               - Drag-and-drop section and point organisation (SortableJS).
+               - Edit mode toggled by a single button: rename sections,
+                 resize cards, create / configure / delete points.
+               - Point configuration modal with Modbus and BACnet parameter
+                 fields, real-time address conflict validation, and protocol
+                 flag selection.
+               - Section creation and management.
+               - Network configuration modal with explicit STA / AP choice.
+               - Light / Dark theme toggle with OS preference detection.
+               - ISA 101 High Performance HMI colour conventions.
+
+  @note        All external libraries are loaded from cdnjs.cloudflare.com so
+               the file served from LittleFS remains a single static document.
+               SortableJS (~50 KB) is the only runtime dependency beyond the
+               standard Web APIs; it is deferred so it does not block first
+               paint.
+
+  @author      Doodz (DoodzProg)
+  @date        2026-04-04
+  @version     1.0.0
+  @repository  https://github.com/DoodzProg/ESP32-BMS-Gateway-Multi-Protocol
 ============================================================================== -->
 
 <!DOCTYPE html>
@@ -17,63 +36,399 @@
 </head>
 <body>
 
+    <!-- ======================================================================
+         TOP NAVIGATION BAR
+         Contains: title, system badges, IP info, protocol info, action buttons.
+    ====================================================================== -->
     <div class="top-bar">
-        
+
         <div class="top-left">
-            <div class="top-bar-title">Web View - BMS Gateway Supervision</div>
+            <div class="top-bar-title">
+                BMS Gateway
+                <!-- Version badge with GitHub repository link -->
+                <a href="https://github.com/DoodzProg/ESP32-BMS-Gateway-Multi-Protocol"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   class="title-ver-link"
+                   title="View repository on GitHub">
+                    <span class="title-ver">v1.0.0</span>
+                    <!-- GitHub mark SVG (official, monochromatic) -->
+                    <svg class="github-mark" viewBox="0 0 98 96" xmlns="http://www.w3.org/2000/svg" aria-label="GitHub">
+                        <path fill-rule="evenodd" clip-rule="evenodd"
+                              d="M48.854 0C21.839 0 0 22 0 49.217c0 21.756
+                              13.993 40.172 33.405 46.69 2.427.49 3.316-1.059
+                              3.316-2.362 0-1.141-.08-5.052-.08-9.127-13.59
+                              2.934-16.42-5.867-16.42-5.867-2.184-5.704-5.42-7.17-5.42-7.17-4.448-3.015.324-3.015.324-3.015
+                              4.934.326 7.523 5.052 7.523 5.052 4.367 7.496
+                              11.404 5.378 14.235 4.074.404-3.178 1.699-5.378
+                              3.074-6.6-10.839-1.141-22.243-5.378-22.243-24.283
+                              0-5.378 1.94-9.778 5.014-13.2-.485-1.222-2.184-6.275.486-13.038
+                              0 0 4.125-1.304 13.426 5.052a46.97 46.97 0 0 1
+                              12.214-1.63c4.125 0 8.33.571 12.213 1.63
+                              9.302-6.356 13.427-5.052 13.427-5.052 2.67 6.763.97
+                              11.816.485 13.038 3.155 3.422 5.015 7.822 5.015
+                              13.2 0 18.905-11.404 23.06-22.324 24.283 1.78
+                              1.548 3.316 4.481 3.316 9.126 0 6.6-.08
+                              11.897-.08 13.526 0 1.304.89 2.853 3.316 2.364
+                              19.412-6.52 33.405-24.935 33.405-46.691C97.707 22
+                              75.788 0 48.854 0z"/>
+                    </svg>
+                </a>
+            </div>
             <div class="sys-badges">
-                <span class="badge" id="ramBadge" title="Real-time SRAM Usage">RAM: --%</span>
-                <span class="badge status-online"><span class="pulse"></span> ONLINE</span>
+                <span class="badge" id="ramBadge" title="Real-time SRAM Usage">
+                    <!-- Chip / memory icon -->
+                    <svg viewBox="0 0 24 24" width="10" height="10" stroke="currentColor" stroke-width="2" fill="none">
+                        <rect x="2" y="7" width="20" height="10" rx="1"/>
+                        <path d="M7 7V5M12 7V5M17 7V5M7 17v2M12 17v2M17 17v2"/>
+                    </svg>
+                    RAM: --%
+                </span>
+                <span class="badge status-online">
+                    <span class="pulse"></span>
+                    ONLINE
+                </span>
             </div>
         </div>
 
         <div class="top-right">
+            <!-- IP address readouts (click to copy) -->
             <div class="ip-block">
-                <span class="copy-hover" title="Click to copy IP" onclick="copyIp(this, 'clientIpSpan')">Client IP: <b id="clientIpSpan">...</b></span>
-                <span class="copy-hover" title="Click to copy IP" onclick="copyIp(this, 'espIpSpan')">Device IP: <b id="espIpSpan">...</b></span>
+                <span class="copy-hover" title="Click to copy Client IP"
+                      onclick="copyIp(this,'clientIpSpan')">
+                    Client IP: <b id="clientIpSpan">...</b>
+                    <!-- Copy icon -->
+                    <svg class="copy-icon" viewBox="0 0 24 24" width="10" height="10"
+                         stroke="currentColor" stroke-width="2" fill="none">
+                        <rect x="9" y="9" width="13" height="13" rx="2"/>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                    </svg>
+                </span>
+                <span class="copy-hover" title="Click to copy Device IP"
+                      onclick="copyIp(this,'espIpSpan')">
+                    Device IP: <b id="espIpSpan">...</b>
+                    <svg class="copy-icon" viewBox="0 0 24 24" width="10" height="10"
+                         stroke="currentColor" stroke-width="2" fill="none">
+                        <rect x="9" y="9" width="13" height="13" rx="2"/>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                    </svg>
+                </span>
             </div>
 
+            <!-- Protocol port readouts (click to copy) -->
             <div class="protocols">
-                <span class="copy-hover" title="Click to copy Port" onclick="copyPort(this, '502')">Modbus TCP: 502</span>
-                <span class="copy-hover" title="Click to copy Port" onclick="copyPort(this, '47808')">BACnet/IP: 47808</span>
+                <span class="copy-hover" title="Modbus TCP — Click to copy port"
+                      onclick="copyPort(this,'502')">
+                    <!-- Modbus TCP icon (server/stack) -->
+                    <svg viewBox="0 0 24 24" width="10" height="10" stroke="currentColor"
+                         stroke-width="2" fill="none">
+                        <rect x="2" y="2" width="20" height="8" rx="2"/>
+                        <rect x="2" y="14" width="20" height="8" rx="2"/>
+                        <circle cx="6" cy="6" r="1" fill="currentColor"/>
+                        <circle cx="6" cy="18" r="1" fill="currentColor"/>
+                    </svg>
+                    Modbus TCP: 502
+                </span>
+                <span class="copy-hover" title="BACnet/IP — Click to copy port"
+                      onclick="copyPort(this,'47808')">
+                    <!-- BACnet icon (network/broadcast) -->
+                    <svg viewBox="0 0 24 24" width="10" height="10" stroke="currentColor"
+                         stroke-width="2" fill="none">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M6.3 6.3a8 8 0 0 0 0 11.31M17.7 6.3a8 8 0 0 1 0 11.31"/>
+                        <path d="M3.5 3.5a12 12 0 0 0 0 16.97M20.5 3.5a12 12 0 0 1 0 16.97"/>
+                    </svg>
+                    BACnet/IP: 47808
+                </span>
             </div>
 
-            <button id="networkBtn" class="btn btn-action" style="display:none;" onclick="openModal()">
-                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M5 12.55a11 11 0 0 1 14.08 0"></path>
-                    <path d="M1.42 9a16 16 0 0 1 21.16 0"></path>
-                    <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
-                    <line x1="12" y1="20" x2="12.01" y2="20"></line>
+            <!-- Edit layout toggle button -->
+            <button id="editToggleBtn" class="btn btn-edit-toggle" onclick="toggleEditMode()">
+                <!-- Pencil/edit icon -->
+                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor"
+                     stroke-width="2" fill="none">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                 </svg>
-                <span id="networkBtnText">Network Config...</span>
+                <span id="editToggleTxt">Edit Layout</span>
             </button>
-            
-            <button id="themeToggle" class="theme-btn" title="Toggle Theme"></button>
+
+            <!-- Network configuration button (shown after system info loads) -->
+            <button id="networkBtn" class="btn btn-action" style="display:none;"
+                    onclick="openNetModal()">
+                <!-- Network/wifi icon -->
+                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor"
+                     stroke-width="2" fill="none" stroke-linecap="round"
+                     stroke-linejoin="round">
+                    <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
+                    <path d="M1.42 9a16 16 0 0 1 21.16 0"/>
+                    <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+                    <line x1="12" y1="20" x2="12.01" y2="20"/>
+                </svg>
+                <span id="networkBtnText">Network Config</span>
+            </button>
+
+            <!-- Light / Dark theme toggle -->
+            <button id="themeToggle" class="theme-btn" title="Toggle Light/Dark Theme"></button>
         </div>
     </div>
 
+    <!-- ======================================================================
+         EDIT MODE TOOLBAR
+         Appears below the top bar only when edit mode is active.
+    ====================================================================== -->
+    <div class="edit-toolbar" id="editToolbar">
+        <span class="edit-toolbar-label">EDIT MODE</span>
+
+        <button class="btn btn-add-section" onclick="openAddSectionModal()">
+            <!-- Plus icon -->
+            <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor"
+                 stroke-width="2.5" fill="none">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Add Section
+        </button>
+
+        <button class="btn btn-add-point" onclick="openAddPointModal()">
+            <!-- Plus icon -->
+            <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor"
+                 stroke-width="2.5" fill="none">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Add Point
+        </button>
+
+        <span class="edit-hint">
+            <!-- Grip / drag icon -->
+            <svg viewBox="0 0 24 24" width="11" height="11" stroke="currentColor"
+                 stroke-width="2" fill="none" style="vertical-align:middle">
+                <circle cx="9" cy="5"  r="1" fill="currentColor"/>
+                <circle cx="9" cy="12" r="1" fill="currentColor"/>
+                <circle cx="9" cy="19" r="1" fill="currentColor"/>
+                <circle cx="15" cy="5"  r="1" fill="currentColor"/>
+                <circle cx="15" cy="12" r="1" fill="currentColor"/>
+                <circle cx="15" cy="19" r="1" fill="currentColor"/>
+            </svg>
+            Drag sections and points to reorder &nbsp;·&nbsp; Use card controls below to configure
+        </span>
+    </div>
+
+    <!-- ======================================================================
+         MAIN CONTENT AREA
+         Sections are rendered dynamically into #sectionsRoot by app.js.
+    ====================================================================== -->
     <div class="main-content">
-        <div class="telemetry-panel">
-            <div class="panel-header">PROCESS TELEMETRY (READ-ONLY)</div>
-            
-            <div class="dashboard" id="dashboard">
-                </div>
-            
-        </div>
+        <div id="sectionsRoot"></div>
     </div>
 
-    <div class="modal-overlay" id="netModal">
-        <div class="modal-box">
-            <div class="modal-title" id="modalTitle">Network Configuration</div>
-            <div class="modal-body" id="modalBody">
+    <!-- ======================================================================
+         SIGNATURE FOOTER
+         Discreet "Made by Doodz" watermark — bottom-right, always visible.
+    ====================================================================== -->
+    <div class="site-footer">
+        Made by <a href="https://github.com/DoodzProg"
+                   target="_blank" rel="noopener noreferrer">Doodz</a>
+    </div>
+
+    <!-- ======================================================================
+         POINT CONFIGURATION MODAL
+         Used for both "Add Point" and "Edit Point" workflows.
+    ====================================================================== -->
+    <div class="modal-overlay" id="pointModal">
+        <div class="modal-box modal-wide">
+            <div class="modal-title" id="pointModalTitle">Configure Point</div>
+            <div class="modal-body">
+
+                <!-- Row 1: Name + Type -->
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">POINT NAME</label>
+                        <input type="text" id="pmName" class="input-field"
+                               placeholder="e.g. FanSpeed">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">TYPE</label>
+                        <select id="pmType" class="input-field" onchange="onPointTypeChange()">
+                            <option value="analog">Analog (float)</option>
+                            <option value="binary">Binary (bool)</option>
+                        </select>
+                    </div>
                 </div>
-            <div class="modal-actions" id="modalActions">
-                <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
-                <button class="btn btn-confirm" id="modalConfirmBtn">Confirm</button>
+
+                <!-- Protocol selection -->
+                <div class="form-group" style="margin-top:14px;">
+                    <label class="form-label">ACTIVE PROTOCOLS</label>
+                    <div class="proto-toggles">
+                        <label class="proto-toggle">
+                            <input type="checkbox" id="pmProtoModbus" checked
+                                   onchange="onProtoChange()">
+                            <span class="proto-badge proto-modbus">Modbus TCP</span>
+                        </label>
+                        <label class="proto-toggle">
+                            <input type="checkbox" id="pmProtoBacnet" checked
+                                   onchange="onProtoChange()">
+                            <span class="proto-badge proto-bacnet">BACnet/IP</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Modbus TCP parameters -->
+                <div id="pmModbusSection" style="margin-top:14px;">
+                    <div class="form-section-title">MODBUS TCP</div>
+                    <div class="form-grid">
+                        <div class="form-group" id="pmCoilGroup">
+                            <label class="form-label">COIL ADDRESS</label>
+                            <div class="input-with-status">
+                                <input type="number" id="pmCoil" class="input-field"
+                                       min="0" max="65535" value="0"
+                                       oninput="checkAddress()">
+                                <span class="addr-status" id="coilStatus"></span>
+                            </div>
+                        </div>
+                        <div class="form-group" id="pmRegGroup">
+                            <label class="form-label">HOLDING REGISTER</label>
+                            <div class="input-with-status">
+                                <input type="number" id="pmReg" class="input-field"
+                                       min="0" max="65535" value="100"
+                                       oninput="checkAddress()">
+                                <span class="addr-status" id="regStatus"></span>
+                            </div>
+                        </div>
+                        <div class="form-group" id="pmScaleGroup">
+                            <label class="form-label">
+                                SCALE FACTOR
+                                <span class="form-hint">÷ for read, × for write</span>
+                            </label>
+                            <input type="number" id="pmScale" class="input-field"
+                                   min="0.001" step="0.1" value="1">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BACnet/IP parameters -->
+                <div id="pmBacnetSection" style="margin-top:14px;">
+                    <div class="form-section-title">BACNET/IP</div>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="form-label">OBJECT INSTANCE</label>
+                            <div class="input-with-status">
+                                <input type="number" id="pmBacInst" class="input-field"
+                                       min="0" max="4194302" value="0"
+                                       oninput="checkAddress()">
+                                <span class="addr-status" id="bacInstStatus"></span>
+                            </div>
+                        </div>
+                        <div class="form-group" id="pmUnitGroup">
+                            <label class="form-label">ENGINEERING UNIT</label>
+                            <input type="text" id="pmUnit" class="input-field"
+                                   placeholder="e.g. °C, %, Pa">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Write access -->
+                <div class="form-group" style="margin-top:14px;">
+                    <label class="form-label">WRITE ACCESS</label>
+                    <div class="proto-toggles">
+                        <label class="proto-toggle">
+                            <input type="checkbox" id="pmWritable" checked>
+                            <span class="proto-badge proto-write">Allow writes from web UI</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Target section selector (hidden in edit mode) -->
+                <div class="form-group" id="pmSectionGroup" style="margin-top:14px;">
+                    <label class="form-label">ADD TO SECTION</label>
+                    <select id="pmSection" class="input-field"></select>
+                </div>
+
+                <div class="form-error" id="pmError"></div>
+
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="closePointModal()">Cancel</button>
+                <button class="btn btn-confirm" id="pmConfirmBtn"
+                        onclick="submitPointModal()">Add Point</button>
             </div>
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <!-- ======================================================================
+         SECTION CONFIGURATION MODAL
+         Rename and resize a section, or delete it if empty.
+    ====================================================================== -->
+    <div class="modal-overlay" id="sectionModal">
+        <div class="modal-box">
+            <div class="modal-title" id="sectionModalTitle">Section Settings</div>
+            <div class="modal-body">
+
+                <div class="form-group">
+                    <label class="form-label">SECTION LABEL</label>
+                    <input type="text" id="smLabel" class="input-field"
+                           placeholder="e.g. Air Handling Unit">
+                </div>
+
+                <div class="form-group" style="margin-top:14px;">
+                    <label class="form-label">WIDTH (GRID COLUMNS)</label>
+                    <div class="col-picker" id="colPicker">
+                        <button class="col-opt" data-cols="1"
+                                onclick="selectCols(1)">1</button>
+                        <button class="col-opt" data-cols="2"
+                                onclick="selectCols(2)">2</button>
+                        <button class="col-opt" data-cols="3"
+                                onclick="selectCols(3)">3</button>
+                        <button class="col-opt active" data-cols="4"
+                                onclick="selectCols(4)">4 (Full)</button>
+                    </div>
+                </div>
+
+                <div class="form-error" id="smError"></div>
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn btn-danger" id="smDeleteBtn"
+                        onclick="deleteSection()"
+                        style="margin-right:auto;">
+                    <!-- Trash icon -->
+                    <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor"
+                         stroke-width="2" fill="none">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                        <path d="M10 11v6M14 11v6"/>
+                        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                    </svg>
+                    Delete Section
+                </button>
+                <button class="btn btn-cancel"
+                        onclick="closeSectionModal()">Cancel</button>
+                <button class="btn btn-confirm"
+                        onclick="submitSectionModal()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================================================
+         NETWORK CONFIGURATION MODAL
+         Content is injected dynamically by openNetModal() in app.js.
+         The modal always presents both STA (connect) and AP (isolate) paths.
+    ====================================================================== -->
+    <div class="modal-overlay" id="netModal">
+        <div class="modal-box modal-net">
+            <div class="modal-title" id="netModalTitle">Network Configuration</div>
+            <div class="modal-body" id="netModalBody"></div>
+            <div class="modal-actions" id="netModalActions">
+                <button class="btn btn-cancel" onclick="closeNetModal()">Cancel</button>
+                <button class="btn btn-confirm" id="netModalConfirmBtn">Apply</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SortableJS for drag-and-drop reordering (deferred, non-blocking) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"
+            defer></script>
+    <script src="app.js" defer></script>
 </body>
 </html>

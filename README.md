@@ -1,290 +1,326 @@
-# ESP32 Multi-Protocol BMS Gateway 🏗️
+# ESP32 Multi-Protocol BMS Gateway
 
+[![Version](https://img.shields.io/badge/Version-v1.0.0-brightgreen.svg)](https://github.com/DoodzProg/ESP32-BMS-Gateway-Multi-Protocol/releases/tag/v1.0.0)
 [![Platform](https://img.shields.io/badge/Platform-ESP32--S3-blue.svg)](https://www.espressif.com/en/products/socs/esp32-s3)
-[![Framework](https://img.shields.io/badge/Framework-Arduino-00979D.svg)](https://www.arduino.cc/)
-[![BACnet/IP](https://img.shields.io/badge/BACnet%2FIP-Port_47808-green.svg)](https://github.com/bacnet-stack/bacnet-stack)
-[![Modbus TCP](https://img.shields.io/badge/Modbus_TCP-Port_502-red.svg)](https://modbus.org/)
+[![Framework](https://img.shields.io/badge/Framework-Arduino%20%7C%20PlatformIO-00979D.svg)](https://platformio.org/)
+[![BACnet/IP](https://img.shields.io/badge/BACnet%2FIP-Port_47808-4A90D9.svg)](https://github.com/bacnet-stack/bacnet-stack)
+[![Modbus TCP](https://img.shields.io/badge/Modbus_TCP-Port_502-D94A4A.svg)](https://modbus.org/)
 [![License](https://img.shields.io/badge/License-MIT-lightgrey.svg)](LICENSE)
+[![Flash Tool](https://img.shields.io/badge/Flash-ESP_Web_Tools-orange.svg)](https://DoodzProg.github.io/ESP32-BMS-Gateway-Multi-Protocol)
 
-> **Transform an ESP32-S3 into an active, bidirectional industrial gateway.**
-> Simultaneously expose your data over **BACnet/IP**, **Modbus TCP**, and a real-time **Web Dashboard** — all from a single embedded device.
-> Built around a modular, data-driven architecture with persistent network management and zero-configuration discovery.
-
----
-
-## 📋 Table of Contents
-
-- [Overview](#-overview)
-- [First Steps & Usage](#️-first-steps--usage)
-- [Features](#-features)
-- [Architecture](#-project-architecture)
-- [Default Use Case — AHU Simulator](#-default-use-case-ahu-simulator)
-- [Installation & Deployment](#️-installation--deployment)
-- [Network Configuration Details](#-network-configuration-details)
-- [Protocol Reference](#-protocol-reference)
-- [License](#-license)
+> **A $10 industrial protocol bridge — Modbus TCP to BACnet/IP — running on a single ESP32-S3.**
+> Flash it from your browser, connect it to your network, and your BACnet supervisor discovers it instantly.
+> No middleware. No cloud. No dedicated server.
 
 ---
 
-## 🔍 Overview
+## Table of Contents
 
-The **ESP32 Multi-Protocol BMS Gateway** bridges industrial automation protocols and modern web interfaces on a single, low-cost microcontroller. It is designed for engineers and integrators who need to expose BMS (Building Management System) data points over standard protocols — without a dedicated server, middleware, or cloud dependency.
-
-**Typical applications include:**
-
-- Connecting HVAC equipment to a BACnet/IP supervisor (SCADA, EBO, Desigo CC)
-- Exposing sensor data to a Modbus TCP master (PLC, datalogger)
-- Providing an embedded web HMI for local monitoring and commissioning
-- Prototyping BMS point maps before deploying to production controllers
+- [Overview](#overview)
+- [Features](#features)
+- [Quick Install — Zero Code Required](#quick-install--zero-code-required)
+- [Manual Installation — For Developers](#manual-installation--for-developers)
+- [Hardware Requirements](#hardware-requirements)
+- [Usage & Configuration](#usage--configuration)
+- [Architecture](#architecture)
+- [Protocol Reference](#protocol-reference)
+- [License & Author](#license--author)
 
 ---
 
-## 🕹️ First Steps & Usage
+## Overview
 
-The gateway is designed to be **plug-and-play out of the box**. No configuration file or compilation is required for initial use.
+The **ESP32 Multi-Protocol BMS Gateway** is an open-source firmware that transforms an ESP32-S3 into a fully bidirectional industrial gateway. It simultaneously exposes data points over **BACnet/IP** and **Modbus TCP**, while serving an embedded **High Performance HMI** (ISA 101 compliant) directly from the device flash.
 
-### Step 1 — Power On & Connect
+**The core use case:** you have equipment that speaks Modbus TCP (a VFD, a sensor, a PLC output) and your building supervisor speaks BACnet/IP (EBO, Desigo CC, SCADA). This device sits between them, translates in real time, and costs under $10 in hardware.
 
-On first boot (or when no saved network is found), the device automatically creates its own Wi-Fi access point:
+**Typical applications:**
+
+- Connecting HVAC equipment or drives to a BACnet/IP supervisor
+- Exposing Modbus TCP slave data to a BACnet network without a PC gateway
+- Local commissioning and monitoring via an embedded web HMI
+- Rapid BMS point map prototyping before production deployment
+
+---
+
+## Features
+
+**Plug & Play — Zero Installation**
+- Flash directly from your browser via [ESP Web Tools](https://DoodzProg.github.io/ESP32-BMS-Gateway-Multi-Protocol) — no IDE, no drivers, no command line
+- Automatic Wi-Fi Access Point fallback (`BMS-Gateway-Config`) when no saved network is reachable
+- Accessible on the LAN via mDNS at `http://bms-gateway.local` — no IP address to memorize
+
+**Industrial Web HMI (ISA 101 Compliant)**
+- Redesigned interface following the ISA 101 High Performance HMI standard: desaturated colors, SVG icons, color contrast reserved for operational states (RUN/STOP) and alarms only
+- Single-Page Application (SPA) — near-instant page loads served directly from ESP32 flash
+- Live point configuration (Modbus register / BACnet object mapping) with real-time address conflict detection
+- Front-end value caching via `sessionStorage` — display does not blank during a device reboot
+
+**C++ Engine & Protocol Stack**
+- **Simultaneous BACnet/IP and Modbus TCP** — both servers run concurrently with no interference
+- **Expanded BACnet stack limits:** 64 Analog Values, 64 Binary Values, 128 objects maximum — stable operation with tools like YABE and professional supervisors
+- **LittleFS `config.json`** — all point configurations are saved to flash and survive power cuts
+- **NVRAM** — Wi-Fi credentials and AP/STA mode override persist across reboots and OTA updates
+- **Safe Reboot mechanism** — configuration changes from the web UI trigger a clean, watchdog-safe restart sequence
+
+**Data-Driven Architecture**
+- All BMS points are declared once in `state.cpp` and automatically reflected across both protocols and the web UI
+- No duplicated register maps or object tables — a single source of truth by design
+
+---
+
+## Quick Install — Zero Code Required
+
+No development environment is required. The entire flashing process happens in your browser in under two minutes.
+
+### Step 1 — Open the Flash Page
+
+Navigate to the project GitHub Pages using the link or QR code below:
+
+**[https://DoodzProg.github.io/ESP32-BMS-Gateway-Multi-Protocol](https://DoodzProg.github.io/ESP32-BMS-Gateway-Multi-Protocol)**
+
+<div align="center">
+  <img src="assets/QRcode_Installer-web.png" alt="QR Code for Web Installer" width="150"/>
+</div>
+
+> **Browser requirement:** Google Chrome or Microsoft Edge (desktop). ESP Web Tools requires WebSerial API support, which Firefox does not currently provide.
+
+### Step 2 — Connect and Flash
+
+1. Plug your ESP32-S3 into your computer via USB.
+2. Click **"Connect"** on the flash page and select the correct COM port from the browser dialog.
+3. Click **"Install ESP32 BMS Gateway"** and wait for the process to complete (approximately 60–90 seconds).
+4. The device reboots automatically when finished.
+
+> If this is not a fresh board, perform a full **Erase Flash** before installing to avoid partition conflicts. This option is available directly on the flash page.
+
+### Step 3 — First Boot
+
+On first boot, or whenever no saved Wi-Fi network is found, the device creates its own Access Point:
 
 | Parameter | Value |
 | :--- | :--- |
-| **SSID** | `bms-gateway-config` |
-| **Password** | `admin1234` |
+| SSID | `BMS-Gateway-Config` |
+| Password | `admin1234` |
+| Fallback IP | `192.168.4.1` |
 
-Connect to this network from any computer, tablet, or smartphone.
+Connect to this network, then open `http://bms-gateway.local` or `http://192.168.4.1` in your browser.
 
-> ⚠️ **Security Notice:** Change the default AP credentials before deploying in a production environment. The AP is intended for commissioning only.
+> **Security notice:** Change the default AP credentials before deploying in a production environment.
 
-### Step 2 — Open the Web Dashboard
+### Step 4 — Join Your Infrastructure Network
 
-Once connected to the AP, open your browser and navigate to:
+In the web interface, open the **Network** panel:
 
-```
-http://bms-gateway.local
-```
+1. Click **Scan** to list available Wi-Fi networks.
+2. Select your network and enter the passphrase.
+3. Click **Connect**. The device saves credentials to NVRAM and reboots.
 
-> **Fallback IP address:** [`http://192.168.4.1`](http://192.168.4.1) — use this if mDNS is not supported by your OS or browser.
-
-The dashboard loads immediately and displays all live data points with their current values. No additional software or drivers are required.
-
-### Step 3 — Join Your Local Network
-
-Click the **"Network Config"** button in the top-right corner of the dashboard. This opens the network management panel, which allows you to:
-
-1. **Scan** for available Wi-Fi networks in range (Enterprise WPA2, Home WPA/WPA2, or 4G/LTE hotspot).
-2. **Select** your target network and enter the passphrase.
-3. **Confirm** the connection. The device saves the credentials to its NVRAM and reboots automatically.
-
-### Step 4 — Persistent Operation
-
-After reconnecting to your local infrastructure:
-
-- The gateway joins your network on every subsequent boot — no reconfiguration needed.
-- BACnet/IP (UDP port `47808`) and Modbus TCP (port `502`) are immediately available to all devices on the same network.
-- The web dashboard remains accessible at `http://bms-gateway.local` from any browser on the LAN.
-
-> 💡 If the saved network becomes unreachable (wrong credentials, SSID change, etc.), the gateway **automatically falls back to AP mode** so you can reconfigure it without physical access to the serial port.
+After reconnecting, BACnet/IP (UDP `47808`) and Modbus TCP (TCP `502`) are immediately available on your LAN. The dashboard is accessible at `http://bms-gateway.local` from any browser on the same network.
 
 ---
 
-## 🚀 Features
+## Manual Installation — For Developers
 
-| Feature | Detail |
+Use this method to modify the firmware, add custom data points, or contribute to the project.
+
+**Requirements:** [Visual Studio Code](https://code.visualstudio.com/) + [PlatformIO IDE extension](https://platformio.org/install/ide?install=vscode)
+
+### Step 1 — Clone the Repository
+
+```bash
+git clone https://github.com/DoodzProg/ESP32-BMS-Gateway-Multi-Protocol.git
+cd ESP32-BMS-Gateway-Multi-Protocol
+```
+
+### Step 2 — Open in PlatformIO
+
+Open the cloned folder in VS Code. PlatformIO will detect `platformio.ini` and resolve all dependencies automatically.
+
+### Step 3 — Erase Flash (First Use)
+
+Mandatory on a new board or after any partition layout change:
+
+```
+PlatformIO sidebar → Platform → Erase Flash
+```
+
+### Step 4 — Build and Upload the Filesystem
+
+The web dashboard (HTML, CSS, JS) lives in `data/` and is packaged into a LittleFS image:
+
+```
+PlatformIO sidebar → Platform → Build Filesystem Image
+PlatformIO sidebar → Platform → Upload Filesystem Image
+```
+
+### Step 5 — Build and Upload the Firmware
+
+```bash
+pio run --target upload
+```
+
+Or use the **Upload** button (→) in the PlatformIO toolbar.
+
+### Step 6 — Monitor
+
+Open the Serial Monitor at **115200 baud** to observe boot logs, Wi-Fi status, assigned IP address, and protocol initialization output.
+
+### Adding a Custom Data Point
+
+Declare the new point in `state.cpp`. Both the BACnet and Modbus handlers enumerate the state registry at runtime — no other files need to be modified.
+
+---
+
+## Hardware Requirements
+
+### Recommended Target
+
+| Parameter | Specification |
 | :--- | :--- |
-| 🟢 **Bidirectional BACnet/IP** | Full `ReadProperty` and `WriteProperty` support. Remote supervisors can both read sensor data and write setpoints. |
-| 🔴 **Modbus TCP Server** | Exposes Coils (binary outputs) and Holding Registers (analog values) on TCP port `502`. Compatible with any standard Modbus master. |
-| 🌐 **Embedded Web Dashboard** | Flat-design HTML/CSS/JS interface served directly from a dedicated LittleFS partition on the ESP32 flash. No external server required. |
-| ⚡ **Real-Time Protocol Sync** | Any write to a data point — via BACnet, Modbus, or the web UI — is instantly reflected across all three interfaces. Single source of truth. |
-| 📡 **AP Fallback** | If the target Wi-Fi network is unavailable, the device reverts to its own AP automatically, preventing permanent lock-out. |
-| 🔍 **Zero-Config mDNS Discovery** | Accessible via `bms-gateway.local` without knowing the IP address. Works on macOS, iOS, Linux, and most Windows environments. |
-| 💾 **NVRAM Persistence** | Network credentials and configuration are stored in non-volatile memory. Settings survive power cycles and firmware updates. |
-| 🏗️ **Data-Driven Architecture** | All BMS points are declared once in a central state file. Adding a new point automatically exposes it across all protocols. |
+| **SoC** | ESP32-S3 |
+| **Flash** | 16 MB (N16R8 variant recommended) |
+| **PSRAM** | 8 MB (optional — not required for operation) |
+| **USB** | USB-C with data lines (not charge-only) |
+
+The firmware is built and tested on the **ESP32-S3 N16R8**. This variant provides sufficient flash for the LittleFS partition (web dashboard), the firmware binary, and future OTA partitions with comfortable margin.
+
+PSRAM is not required for the gateway to operate. It becomes beneficial if you significantly expand the point map (50+ points) or enable future features such as data logging.
+
+### Minimum Viable Hardware
+
+Any ESP32-S3 development board with at least **8 MB of flash** will run the firmware. The web dashboard filesystem image (`littlefs.bin`) is flashed at address `0x610000` and requires roughly 1.5 MB of available flash beyond the application partition.
+
+> Standard ESP32 (non-S3) and ESP32-S2 variants are **not supported** due to differences in the USB peripheral and memory layout used by this firmware.
 
 ---
 
-## 📐 Project Architecture
+## Usage & Configuration
 
-The project enforces a strict **Data-Driven Architecture**: every data point is declared once in `state.cpp` and is automatically reflected across all protocol handlers. There is no duplication of register maps or object tables.
+### Connecting via the AP Fallback
+
+If the gateway cannot reach its saved Wi-Fi network (network down, credentials changed, first boot), it automatically activates its fallback Access Point within 30 seconds. No physical reset or serial port access is required.
+
+Connect to `BMS-Gateway-Config` (password: `admin1234`) from any device, then open `http://192.168.4.1`.
+
+### Configuring BMS Points
+
+Once on the dashboard:
+
+1. Navigate to the **Points** configuration panel.
+2. For each data point, assign a **name**, a **Modbus register address** (Holding Register or Coil), and a **BACnet object** (Analog Value or Binary Value with its instance number).
+3. The interface checks for address conflicts in real time and highlights any duplicates before you save.
+4. Click **Save Configuration**. The device performs a Safe Reboot, applying the new point map cleanly without triggering the watchdog.
+
+Configuration is written to `/config.json` on the LittleFS partition. It persists through power cuts, OTA updates, and reboots.
+
+### Default Point Map (AHU Simulator)
+
+The firmware ships with a pre-configured Air Handling Unit simulator for out-of-the-box integration testing:
+
+| Point | BACnet Object | Modbus Address | Description | Range |
+| :--- | :---: | :---: | :--- | :--- |
+| Fan Status | BV:0 | Coil 10 | Fan run/stop command | 0 = Stop, 1 = Run |
+| Fan Speed | AV:0 | Holding Reg. 100 | VSD setpoint | 0–100 % |
+| Temp Setpoint | AV:1 | Holding Reg. 101 | Supply air setpoint | ×10 — e.g., `210` = 21.0 °C |
+
+> **Modbus scaling note:** The scaling factor is dynamically configurable per point via the Web UI. For example, TempSetpoint uses a ×10 scale to preserve one decimal place in a 16-bit integer register (value 21.0 is transmitted as 210), while FanSpeed uses a ×1 scale.
+
+### Web Interface Navigation
+
+| Section | Description |
+| :--- | :--- |
+| **Dashboard (View Mode)** | Live view of all configured data points, gauges, and their current values. |
+| **Dashboard (Edit Mode)** | Add, edit, remove, or drag-and-drop points and sections. Map Modbus/BACnet addresses. |
+| **Network Config** | Wi-Fi scan, credential input, connection status, and explicit AP/STA mode override. |
+
+---
+
+## Architecture
 
 ```
 ESP32-BMS-Gateway-Multi-Protocol/
 │
 ├── src/
-│   ├── main.cpp                ← Orchestration layer: setup(), loop(), task scheduling
-│   ├── state.cpp               ← Centralized data point registry (BinaryPoint, AnalogPoint)
-│   ├── bacnet_handler.cpp      ← BACnet/IP stack integration, dynamic UDP routing, object callbacks
-│   ├── modbus_handler.cpp      ← Modbus TCP register mapping ↔ shared state synchronization
-│   └── web_handler.cpp         ← REST API endpoints, network scan/connect, mDNS registration
+│   ├── main.cpp                ← Orchestration: setup(), loop(), task scheduling, Safe Reboot
+│   ├── state.cpp               ← Centralized point registry (AnalogPoint, BinaryPoint)
+│   ├── bacnet_handler.cpp      ← BACnet/IP stack, dynamic UDP routing, object callbacks
+│   ├── modbus_handler.cpp      ← Modbus TCP register map ↔ shared state synchronization
+│   └── web_handler.cpp         ← REST API, point config, network scan/connect, mDNS
 │
-├── data/                       ← Front-end assets (HTML, CSS, JS) — packaged into LittleFS
-│   ├── index.html              ← Main dashboard page
-│   ├── style.css               ← Flat-design stylesheet
-│   └── app.js                  ← Real-time data polling and UI logic
+├── data/                       ← Front-end assets packaged into LittleFS
+│   ├── index.html              ← Single-Page Application shell
+│   ├── style.css               ← ISA 101 compliant stylesheet
+│   └── app.js                  ← Real-time polling, sessionStorage caching, conflict detection
 │
 ├── lib/
-│   └── bacnet/                 ← Vendored, heavily optimized C BACnet stack (embedded target)
+│   └── bacnet/                 ← Vendored C BACnet stack, optimized for embedded targets
 │
-└── platformio.ini              ← Build configuration: 8 MB flash layout, partition table, flags
+├── docs/                       ← GitHub Pages — ESP Web Tools flash interface
+│
+└── platformio.ini              ← Build config: 16 MB flash layout, partition table, build flags
 ```
 
 ### Data Flow
 
+All three interfaces share a single state registry. A write from any source — BACnet supervisor, Modbus master, or web UI — is immediately visible on all others. There is no protocol-to-protocol translation layer.
+
 ```
-Write via Web UI
-      │
-      ▼
-  state.cpp  ←──────────────────────────────────┐
-  (shared)                                       │
-      │                                          │
-      ├──► bacnet_handler.cpp  ──► BACnet/IP Supervisor
-      │
-      └──► modbus_handler.cpp  ──► Modbus TCP Master
+BACnet/IP Supervisor ──► bacnet_handler.cpp ──┐
+                                               │
+Modbus TCP Master    ──► modbus_handler.cpp ──►│──► state.cpp (shared registry) ──► all interfaces
+                                               │
+Web Dashboard        ──► web_handler.cpp    ──┘
 ```
 
-All three protocol handlers read from and write to the same shared state. There is no protocol-to-protocol translation layer — consistency is guaranteed by design.
-
 ---
 
-## 📦 Default Use Case — AHU Simulator
-
-The firmware ships with a pre-configured **Air Handling Unit (AHU)** simulator. This demonstrates a typical BMS point map and validates integration with a BACnet supervisor or Modbus master out of the box.
-
-| Point Name | BACnet Object | Modbus Address | Web Interface | Description | Range / Unit |
-| :--- | :---: | :---: | :---: | :--- | :--- |
-| **Fan Status** | Binary Value `BV:0` | Coil `10` | ON / OFF toggle | Fan run/stop command | `0` = Stop, `1` = Run |
-| **Fan Speed** | Analog Value `AV:0` | Holding Register `100` | Slider (%) | Variable speed drive setpoint | `0` to `100` % |
-| **Temp Setpoint** | Analog Value `AV:1` | Holding Register `101` | Numeric input (°C) | Supply air temperature setpoint | Stored as integer ×10 — e.g., `210` = 21.0 °C |
-
-> 📝 **Modbus scaling note:** Analog values use a fixed ×10 multiplier to preserve one decimal place within integer registers. Your Modbus master must apply the corresponding ÷10 scaling on read and ×10 on write.
-
-> 📝 **Extending the point map:** To add a new data point, declare it in `state.cpp`. The BACnet and Modbus handlers enumerate the state registry at runtime — no further changes are required.
-
----
-
-## ⚙️ Installation & Deployment
-
-### Prerequisites
-
-- ESP32-S3 development board (8 MB flash recommended)
-- USB cable with data lines (not charge-only)
-
----
-
-### Method A — Quick Flash (Pre-compiled Binaries)
-
-No development environment required. Download the latest binaries from the [**Releases page**](../../releases) and flash them using the [**Espressif Web Flash Tool**](https://espressif.github.io/esptool-js/) directly from your browser.
-
-Flash the two files at the following addresses:
-
-| File | Flash Address | Description |
-| :--- | :---: | :--- |
-| `firmware.bin` | `0x10000` | Main application firmware |
-| `littlefs.bin` | `0x410000` | Web dashboard filesystem image |
-
-**Procedure:**
-
-1. Open the [ESP Tool](https://espressif.github.io/esptool-js/) in your browser.
-2. Connect your ESP32-S3 via USB and select the correct COM port.
-3. Add both files with their respective addresses.
-4. Click **"Program"** and wait for both uploads to complete.
-5. Press the **Reset** button on the board — the gateway boots immediately.
-
-> ⚠️ If the device was previously flashed with other firmware, perform a full **Erase Flash** before flashing to avoid partition conflicts.
-
----
-
-### Method B — Build from Source (PlatformIO)
-
-Use this method if you want to modify the firmware, add custom data points, or contribute to the project.
-
-**Requirements:** [Visual Studio Code](https://code.visualstudio.com/) + [PlatformIO IDE extension](https://platformio.org/install/ide?install=vscode)
-
-**Steps:**
-
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/DoodzProg/ESP32-BMS-Gateway-Multi-Protocol.git
-   cd ESP32-BMS-Gateway-Multi-Protocol
-   ```
-
-2. **Open in PlatformIO:**
-   Open the cloned folder in VS Code. PlatformIO will detect `platformio.ini` and install all dependencies automatically.
-
-3. **Erase the flash** (mandatory on first use or after changing partition layout):
-   ```
-   PlatformIO sidebar → Platform → Erase Flash
-   ```
-
-4. **Build and upload the filesystem** (web dashboard assets):
-   ```
-   PlatformIO sidebar → Platform → Build Filesystem Image
-   PlatformIO sidebar → Platform → Upload Filesystem Image
-   ```
-
-5. **Build and upload the firmware:**
-   Click the standard **Upload** button (→) in the PlatformIO toolbar, or run:
-   ```bash
-   pio run --target upload
-   ```
-
-6. Open the **Serial Monitor** (115200 baud) to observe boot logs, IP address assignment, and protocol initialization status.
-
----
-
-## 🌐 Network Configuration Details
-
-| Parameter | Default Value | Notes |
-| :--- | :--- | :--- |
-| AP SSID | `bms-gateway-config` | Active when no saved network is found |
-| AP Password | `admin1234` | Change before production deployment |
-| AP IP Address | `192.168.4.1` | Fixed; used as fallback if mDNS fails |
-| mDNS Hostname | `bms-gateway.local` | Resolves on the LAN after STA connection |
-| BACnet/IP Port | UDP `47808` | Standard BACnet port — no firewall configuration needed on most LANs |
-| Modbus TCP Port | TCP `502` | Standard Modbus port |
-| Credential Storage | NVRAM (NVS) | Survives power cycles and OTA updates |
-
----
-
-## 📡 Protocol Reference
+## Protocol Reference
 
 ### BACnet/IP
 
-- **Transport:** UDP, port `47808`
-- **Supported services:** `ReadProperty`, `WriteProperty`, `Who-Is` / `I-Am` (device discovery)
-- **Object types exposed:** Binary Value (BV), Analog Value (AV)
-- **Discovery:** The gateway responds to broadcast `Who-Is` requests and announces itself with `I-Am` — compatible with any BACnet/IP supervisor without manual address configuration.
+| Parameter | Value |
+| :--- | :--- |
+| Transport | UDP, port `47808` |
+| Supported services | `ReadProperty`, `WriteProperty`, `Who-Is` / `I-Am` |
+| Object types | Binary Value (BV), Analog Value (AV) |
+| Capacity | 64 AV, 64 BV, 128 objects maximum |
+| Discovery | Responds to broadcast `Who-Is` — zero manual address configuration |
 
 ### Modbus TCP
 
-- **Transport:** TCP, port `502`
-- **Supported function codes:**
-  - `FC01` — Read Coils
-  - `FC05` — Write Single Coil
-  - `FC03` — Read Holding Registers
-  - `FC06` — Write Single Register
-  - `FC16` — Write Multiple Registers
-- **Coil addressing:** 0-based (Coil `10` = address `10`)
-- **Register addressing:** 0-based (Holding Register `100` = address `100`)
+| Parameter | Value |
+| :--- | :--- |
+| Transport | TCP, port `502` |
+| FC01 | Read Coils |
+| FC05 | Write Single Coil |
+| FC03 | Read Holding Registers |
+| FC06 | Write Single Register |
+| FC16 | Write Multiple Registers |
+| Addressing | 0-based for both coils and holding registers |
 
-### REST API (Web Interface)
+### REST API
 
-The web dashboard communicates with the firmware over a lightweight REST API served on port `80`. Endpoints follow a simple JSON structure and can be called directly with `curl` or any HTTP client for integration and testing.
+The web dashboard communicates with the firmware over a lightweight JSON REST API on port `80`. All endpoints can be called directly with `curl` or any HTTP client for scripting and integration testing.
 
 ---
 
-## 📄 License
+## License & Author
 
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for full terms.
+This project is licensed under the **MIT License** — see [LICENSE](LICENSE) for full terms.
+
+**Author:** DoodzProg — [github.com/DoodzProg](https://github.com/DoodzProg)
 
 **Third-party components:**
 
-- [`bacnet-stack`](https://github.com/bacnet-stack/bacnet-stack) — Licensed under **GNU GPL v2 or later**. The vendored BACnet library included in `lib/bacnet/` retains its original GPL license. If you distribute a modified version of this firmware, ensure your distribution complies with the GPL terms for that component.
+[`bacnet-stack`](https://github.com/bacnet-stack/bacnet-stack) — Licensed under **GNU GPL v2 or later**. The vendored BACnet library in `lib/bacnet/` retains its original GPL license. Distributions of modified versions of this firmware must comply with the GPL terms for that component.
 
 ---
 
 <div align="center">
 
-*Crafted with ☕ and an ungodly amount of BACnet Who-Is broadcasts.*
+*Built for the field. Tested with YABE. Powered by too much coffee.*
+
+**[Flash Now — No Setup Required](https://DoodzProg.github.io/ESP32-BMS-Gateway-Multi-Protocol)**
 
 </div>

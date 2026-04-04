@@ -1,167 +1,1185 @@
 /**
- * ==============================================================================
- * @file style.css
- * @brief Flat 2D Industrial styling for the BMS Gateway.
- * @details Implements a responsive grid, CSS variables for dynamic light/dark 
- * themes, hardware-accelerated transitions, and interactive hover states.
- * @author [Your Name / Project Name]
- * @date 2024
- * ==============================================================================
+ * @file        style.css
+ * @brief       Industrial flat-design stylesheet for the BMS Gateway v1.0.0.
+ *
+ * @details     ISA 101 High Performance HMI compliant stylesheet.
+ * Design principles applied:
+ * - Neutral, de-saturated background palette for both themes.
+ * - High-contrast accents reserved exclusively for actionable
+ * elements and alarm / status indicators.
+ * - Clear visual separation between "display" surfaces
+ * (bg-screen, value-display) and "action" surfaces (buttons).
+ * - Edit mode visual cues (toolbar, drag handles, overlay
+ * controls).
+ * - Drag-and-drop affordances for SortableJS.
+ * - Point configuration modal with multi-column form grid.
+ * - Section card with strict resizable column-width utilities.
+ * - Protocol badge toggles with accessible checkbox styling.
+ * - Responsive breakpoints for tablet-width screens.
+ * - GitHub mark integration in the title bar.
+ * - Discreet site-footer signature.
+ *
+ * @author      Doodz (DoodzProg)
+ * @date        2026-04-04
+ * @version     1.0.0
+ * @repository  https://github.com/DoodzProg/ESP32-BMS-Gateway-Multi-Protocol
  */
 
 /* ==============================================================================
-   THEME VARIABLES (LIGHT/DARK MODE)
+   THEME VARIABLES — LIGHT / DARK
+   All colour decisions flow through these custom properties; no hard-coded
+   colours appear anywhere else in this file.
    ============================================================================== */
+
 :root[data-theme="light"] {
-    --bg-body: #e4e5e6; --bg-panel: #f4f5f6; --bg-card: #ffffff; --bg-screen: #f8f9fa;
-    --text-main: #2b2b2b; --text-dim: #6c757d;
-    --color-run: #2e7d32; --color-stop: #c62828; --color-bar: #00838f; --color-temp: #ef6c00;
-    --border-color: #ced4da; 
+    /* Backgrounds — layered from body (darkest) to screen (lightest) */
+    --bg-body:       #d8dadc;
+    --bg-panel:      #ecedef;
+    --bg-card:       #f7f8f9;
+    --bg-screen:     #e8e9ea;   /* "display" surface — neutral, not white      */
+    --bg-toolbar:    #e2e4e6;
+
+    /* Text */
+    --text-main:     #1e1e1e;
+    --text-dim:      #6a737d;
+    --text-inv:      #ffffff;
+
+    /* Status / semantic accents (ISA 101: saturated only for alarms & action) */
+    --color-run:     #1b6b22;   /* green  — running / OK                       */
+    --color-stop:    #b71c1c;   /* red    — stopped / fault                    */
+    --color-bar:     #006d7a;   /* teal   — primary action / gauge fill        */
+    --color-temp:    #d45800;   /* amber  — temperature / warning              */
+    --color-edit:    #1048a0;   /* blue   — edit mode chrome                   */
+    --color-danger:  #b71c1c;   /* red    — destructive actions                */
+
+    /* Protocol brand colours */
+    --color-modbus:  #6a1b9a;
+    --color-bacnet:  #00574b;
+
+    /* Structural */
+    --border-color:  #c3c8cd;
+    --border-edit:   #1048a0;
+    --shadow-card:   0 1px 3px rgba(0,0,0,0.10);
+    --shadow-drag:   0 8px 24px rgba(0,0,0,0.20);
+    --shadow-modal:  0 16px 48px rgba(0,0,0,0.28);
 }
 
 :root[data-theme="dark"] {
-    --bg-body: #121212; --bg-panel: #1e1e1e; --bg-card: #2a2a2a; --bg-screen: #1c1c1c; 
-    --text-main: #e0e0e0; --text-dim: #888888;
-    --color-run: #4caf50; --color-stop: #f44336; --color-bar: #00bcd4; --color-temp: #ff9800;  
-    --border-color: #3e3e3e; 
+    /* Backgrounds */
+    --bg-body:       #0f0f0f;
+    --bg-panel:      #191919;
+    --bg-card:       #222222;
+    --bg-screen:     #171717;   /* "display" surface                           */
+    --bg-toolbar:    #1d1d1d;
+
+    /* Text */
+    --text-main:     #d8d8d8;
+    --text-dim:      #757575;
+    --text-inv:      #ffffff;
+
+    /* Status / semantic accents */
+    --color-run:     #43a047;   /* green                                        */
+    --color-stop:    #e53935;   /* red                                          */
+    --color-bar:     #00acc1;   /* teal                                         */
+    --color-temp:    #fb8c00;   /* amber                                        */
+    --color-edit:    #3d8ef8;   /* blue                                         */
+    --color-danger:  #e53935;   /* red                                          */
+
+    /* Protocol brand colours */
+    --color-modbus:  #c084fc;
+    --color-bacnet:  #4db6ac;
+
+    /* Structural */
+    --border-color:  #2e2e2e;
+    --border-edit:   #3d8ef8;
+    --shadow-card:   0 1px 4px rgba(0,0,0,0.50);
+    --shadow-drag:   0 8px 28px rgba(0,0,0,0.70);
+    --shadow-modal:  0 16px 48px rgba(0,0,0,0.75);
 }
 
 /* ==============================================================================
-   GLOBAL LAYOUT & TYPOGRAPHY
+   GLOBAL RESET & TYPOGRAPHY
    ============================================================================== */
-body { 
-    background-color: var(--bg-body); 
-    color: var(--text-main); 
-    font-family: 'Segoe UI', Arial, sans-serif; 
-    margin: 0; padding: 0; 
-    transition: all 0.3s ease; 
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+    background-color: var(--bg-body);
+    color: var(--text-main);
+    /* Deliberately industrial / utilitarian typeface stack.                      */
+    /* 'Roboto Mono' feel without an external font load.                          */
+    font-family: 'Consolas', 'Menlo', 'Liberation Mono', monospace;
+    margin: 0;
+    padding: 0;
+    /* Reserve space for the fixed footer signature */
+    padding-bottom: 32px;
+    transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 /* ==============================================================================
    TOP NAVIGATION BAR
    ============================================================================== */
-.top-bar { 
-    border-bottom: 1px solid var(--border-color); 
-    background-color: var(--bg-panel); 
-    padding: 16px 24px; 
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center; 
-    flex-wrap: wrap; 
-    gap: 16px; 
-}
 
-.top-left { display: flex; flex-direction: column; gap: 8px; }
-.top-bar-title { font-size: 16px; font-weight: 700; color: var(--text-main); letter-spacing: 1px; text-transform: uppercase; }
-
-/* System Badges (Hardware Specs & RAM) */
-.sys-badges { display: flex; gap: 8px; font-size: 10px; color: var(--text-dim); font-weight: bold; }
-.badge { background: var(--bg-body); padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 6px; letter-spacing: 0.5px;}
-.pulse { width: 6px; height: 6px; background-color: var(--color-run); border-radius: 50%; animation: blink 1.5s infinite; }
-@keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
-
-.top-right { display: flex; align-items: center; gap: 20px; }
-
-/* Stacked Information Blocks (IPs & Protocols) */
-.ip-block, .protocols { 
-    display: flex; 
-    flex-direction: column; 
-    gap: 6px; 
-    font-size: 13px; 
-    font-weight: 500;
-}
-
-.ip-block span, .protocols span { 
-    background: var(--bg-body); 
-    padding: 6px 10px; 
-    border: 1px solid var(--border-color); 
-    border-radius: 4px;
-    cursor: pointer; 
-    user-select: none; 
-    display: flex; 
-    align-items: center; 
+.top-bar {
+    border-bottom: 1px solid var(--border-color);
+    background-color: var(--bg-panel);
+    padding: 12px 20px;
+    display: flex;
     justify-content: space-between;
-    min-width: 140px;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    /* Subtle left accent line for ISA visual hierarchy */
+    border-left: 3px solid var(--color-bar);
+}
+
+.top-left  { display: flex; flex-direction: column; gap: 6px; }
+.top-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+
+/* Title text */
+.top-bar-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-main);
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Version badge + GitHub mark — combined anchor tag */
+.title-ver-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    text-decoration: none;
+    border-radius: 3px;
+    padding: 1px 2px;
+    transition: opacity 0.15s ease;
+}
+.title-ver-link:hover { opacity: 0.75; }
+
+.title-ver {
+    font-size: 11px;
+    background: var(--color-bar);
+    color: var(--text-inv);
+    padding: 2px 6px;
+    border-radius: 2px;
+    letter-spacing: 0;
+    font-weight: 700;
+    font-family: inherit;
+}
+
+/* GitHub SVG mark — inherits current text colour */
+.github-mark {
+    width: 14px;
+    height: 14px;
+    fill: var(--text-dim);
+    flex-shrink: 0;
+    transition: fill 0.15s ease;
+    vertical-align: middle;
+}
+.title-ver-link:hover .github-mark { fill: var(--text-main); }
+
+/* System status badges row */
+.sys-badges {
+    display: flex;
+    gap: 6px;
+    font-size: 12px;
     color: var(--text-dim);
+    font-weight: 700;
+    letter-spacing: 0.5px;
 }
 
-/* Interactive Hover & Click Animations */
-.copy-hover {
-    transition: transform 0.1s ease, border-color 0.2s ease, color 0.2s ease !important;
-}
-.copy-hover:hover {
-    border-color: var(--color-bar) !important; 
-    color: var(--text-main) !important;
-}
-.copy-hover:active {
-    transform: scale(0.95);
+.badge {
+    background: var(--bg-body);
+    padding: 3px 8px;
+    border-radius: 2px;
+    border: 1px solid var(--border-color);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
 }
 
-.ip-block span b { color: var(--color-bar); font-weight: 700; }
-.protocols span { justify-content: center; }
+/* Pulsing online indicator */
+.pulse {
+    width: 6px;
+    height: 6px;
+    background-color: var(--color-run);
+    border-radius: 50%;
+    flex-shrink: 0;
+    animation: blink 1.6s ease-in-out infinite;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1;    }
+    50%       { opacity: 0.3; }
+}
+
+/* IP / Protocol readout blocks */
+.ip-block,
+.protocols {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.ip-block span,
+.protocols span {
+    background: var(--bg-body);
+    padding: 5px 9px;
+    border: 1px solid var(--border-color);
+    border-radius: 2px;
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 150px;
+    color: var(--text-dim);
+    transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.protocols span { justify-content: center; gap: 6px; }
+
+.copy-hover:hover  { border-color: var(--color-bar) !important; color: var(--text-main) !important; }
+.copy-hover:active { opacity: 0.75; }
+
+.ip-block span b   { color: var(--color-bar); font-weight: 700; }
+
+/* Small copy icon inside IP spans */
+.copy-icon {
+    flex-shrink: 0;
+    opacity: 0.4;
+    transition: opacity 0.15s;
+}
+.copy-hover:hover .copy-icon { opacity: 0.8; }
 
 /* ==============================================================================
-   BUTTONS & CONTROLS
+   BUTTONS
+   ISA 101: buttons have a visually distinct "action" appearance.
    ============================================================================== */
-.btn { padding: 8px 14px; border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; transition: all 0.2s ease; display: flex; align-items: center; gap: 8px;}
-.btn-action { background-color: var(--bg-body); color: var(--text-main); }
+
+.btn {
+    padding: 6px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 2px;
+    cursor: pointer;
+    font-size: 13px; /* Agrandissement bouton classique */
+    font-weight: 700;
+    font-family: inherit;
+    transition: border-color 0.15s ease, color 0.15s ease,
+                background 0.15s ease, opacity 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+/* Generic action button */
+.btn-action       { background: var(--bg-body);  color: var(--text-dim); }
 .btn-action:hover { border-color: var(--color-temp); color: var(--color-temp); }
-.btn-confirm { background-color: var(--color-bar); color: #fff; border: none; padding: 10px 20px; }
-.btn-cancel { background-color: var(--bg-panel); color: var(--text-main); padding: 10px 20px; }
 
-.theme-btn { background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-color); padding: 8px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-.theme-btn:hover { background: var(--border-color); }
+/* Confirm / primary button */
+.btn-confirm {
+    background: var(--color-bar);
+    color: var(--text-inv);
+    border-color: var(--color-bar);
+    padding: 8px 18px;
+}
+.btn-confirm:hover { filter: brightness(1.15); }
 
-/* ==============================================================================
-   DASHBOARD PANELS & TELEMETRY CARDS
-   ============================================================================== */
-.main-content { padding: 32px 24px; max-width: 1200px; margin: 0 auto; }
-.telemetry-panel { background-color: var(--bg-panel); border: 1px solid var(--border-color); padding: 24px; border-radius: 6px; }
-.panel-header { font-size: 14px; font-weight: 700; color: var(--text-dim); margin-bottom: 24px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color); letter-spacing: 1.5px; }
-.dashboard { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 24px; }
+/* Cancel button */
+.btn-cancel {
+    background: var(--bg-panel);
+    color: var(--text-main);
+    padding: 8px 18px;
+}
+.btn-cancel:hover { border-color: var(--text-dim); }
 
-/* Flat Card Design */
-.card { background-color: var(--bg-card); border: 1px solid var(--border-color); padding: 20px; border-radius: 6px; display: flex; flex-direction: column; }
-.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.card-label { font-size: 13px; color: var(--text-main); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;}
-.badge-ro { font-size: 10px; font-weight: bold; color: var(--text-dim); border: 1px solid var(--border-color); padding: 2px 6px; border-radius: 4px; }
+/* Danger / destructive button */
+.btn-danger {
+    background: transparent;
+    color: var(--color-danger);
+    border-color: var(--color-danger);
+}
+.btn-danger:hover { background: var(--color-danger); color: var(--text-inv); }
 
-.value-display { 
-    background-color: var(--bg-screen); 
-    border: 1px solid var(--border-color); 
-    border-radius: 6px;
-    padding: 16px; 
-    min-height: 50px; 
+/* Edit-mode toggle */
+.btn-edit-toggle {
+    background: var(--bg-body);
+    color: var(--text-dim);
+    border-color: var(--border-color);
+}
+.btn-edit-toggle:hover {
+    border-color: var(--color-edit);
+    color: var(--color-edit);
+}
+.btn-edit-toggle.active {
+    background: var(--color-edit);
+    color: var(--text-inv);
+    border-color: var(--color-edit);
 }
 
-.value-wrapper { display: flex; justify-content: space-between; align-items: center; }
-.value-text { font-size: 32px; font-weight: 300; display: flex; align-items: center; color: var(--text-main); }
-.unit { font-size: 16px; color: var(--text-dim); margin-left: 8px; font-weight: 600; }
+/* Toolbar add buttons */
+.btn-add-section,
+.btn-add-point {
+    background: var(--bg-body);
+    color: var(--text-dim);
+    border-color: var(--border-color);
+}
+.btn-add-section:hover { border-color: var(--color-edit); color: var(--color-edit); }
+.btn-add-point:hover   { border-color: var(--color-bar);  color: var(--color-bar);  }
 
-.indicator-square { width: 16px; height: 16px; margin-right: 12px; border-radius: 4px; }
-.state-run { background-color: var(--color-run); } 
+/* Theme toggle (icon-only) */
+.theme-btn {
+    background: var(--bg-body);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+    padding: 6px;
+    border-radius: 2px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.15s ease;
+}
+.theme-btn:hover { border-color: var(--color-bar); }
+
+/* Small inline icon button used inside section header */
+.btn-section-settings {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 2px;
+    color: var(--text-dim);
+    padding: 3px 8px;
+    font-size: 12px; /* Agrandissement bouton settings section */
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    transition: border-color 0.15s ease, color 0.15s ease;
+}
+.btn-section-settings:hover { border-color: var(--color-edit); color: var(--color-edit); }
+
+/* ==============================================================================
+   EDIT MODE TOOLBAR
+   ============================================================================== */
+
+.edit-toolbar {
+    display: none;         /* Hidden by default; .visible reveals it */
+    align-items: center;
+    gap: 10px;
+    padding: 7px 20px;
+    background: var(--bg-toolbar);
+    border-bottom: 2px solid var(--border-edit);
+    flex-wrap: wrap;
+}
+.edit-toolbar.visible { display: flex; }
+
+.edit-toolbar-label {
+    font-size: 12px; /* Agrandissement Edit Mode label */
+    font-weight: 700;
+    color: var(--color-edit);
+    letter-spacing: 2px;
+    border: 1px solid var(--color-edit);
+    padding: 2px 7px;
+    border-radius: 2px;
+}
+
+.edit-hint {
+    font-size: 13px; /* Agrandissement Edit Hint */
+    color: var(--text-dim);
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+/* ==============================================================================
+   MAIN CONTENT & DASHBOARD GRID
+   ============================================================================== */
+
+.main-content {
+    padding: 24px 20px;
+    max-width: 1700px;
+    margin: 0 auto;
+}
+
+#sectionsRoot {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    align-items: flex-start;
+}
+
+/* ==============================================================================
+   SECTION CARDS
+   ============================================================================== */
+
+.section-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    padding: 18px;
+    /* min-width prevents cards from collapsing below readable threshold */
+    min-width: 240px;
+    transition: border-color 0.2s ease;
+    /* Strict sizing: flex-basis is set by .section-cols-N utilities below.
+       flex-grow and flex-shrink are kept at 0 to honour the chosen width. */
+    flex-grow: 0;
+    flex-shrink: 0;
+}
+
+/* Edit mode: dashed outline signals interactivity */
+.edit-active .section-card {
+    border-color: var(--border-edit);
+    border-style: dashed;
+}
+
+/* Section header: label + actions row */
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+    gap: 8px;
+    min-width: 0;
+}
+
+.section-label {
+    font-size: 15px; /* Agrandissement label Section */
+    font-weight: 700;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    /* Prevent label overflow from pushing the actions out of view */
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    min-width: 0;
+    flex: 1 1 0;
+}
+
+/* Action cluster (drag handle + settings button) */
+.section-actions {
+    display: none;        /* Shown only in edit mode */
+    gap: 6px;
+    align-items: center;
+    flex-shrink: 0;
+}
+.edit-active .section-actions { display: flex; }
+
+/* Drag handle for section reordering */
+.section-drag-handle {
+    cursor: grab;
+    color: var(--text-dim);
+    padding: 4px;
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    transition: background 0.15s ease;
+}
+.section-drag-handle:hover  { background: var(--border-color); }
+.section-drag-handle:active { cursor: grabbing; }
+
+/* Three-line hamburger grip icon */
+.drag-handle-icon {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 2px;
+}
+.drag-handle-icon span {
+    display: block;
+    width: 15px;
+    height: 2px;
+    background: var(--text-dim);
+    border-radius: 1px;
+}
+
+/* ==============================================================================
+   POINTS GRID — INSIDE A SECTION
+   auto-fill keeps cards at a sensible minimum; they fill available width.
+   ============================================================================== */
+
+.points-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 14px;
+    /* Needed so empty grids still reserve space for drop targets */
+    min-height: 10px;
+}
+
+/* ==============================================================================
+   POINT CARDS
+   ISA 101: the value display is a clearly distinct "screen" surface.
+   ============================================================================== */
+
+.card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    box-shadow: var(--shadow-card);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    /* Prevent any child from stretching the card beyond its column */
+    min-width: 0;
+    overflow: hidden;
+}
+
+/* Card header: point name + protocol badges */
+.card-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin-bottom: 10px;
+    min-width: 0;
+    overflow: hidden;
+}
+
+/* Point name label */
+.card-label {
+    font-size: 15px; /* Agrandissement Label Point (TempSetPoint) */
+    color: var(--text-main);
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+/* Badge cluster (protocol + R/O) — never grows, wraps if needed */
+.card-meta {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    max-width: 55%;         /* Hard cap to avoid pushing the label off-screen */
+}
+
+/* Protocol + read-only badges */
+.badge-proto {
+    font-size: 12px; /* Agrandissement Badges (MB Reg: 101) */
+    font-weight: 700;
+    padding: 3px 6px;
+    border-radius: 2px;
+    letter-spacing: 0.2px;
+    border: 1px solid transparent;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 105px; /* Agrandissement box pour éviter que ça coupe avec la nouvelle taille */
+}
+
+.badge-modbus { color: var(--color-modbus); border-color: var(--color-modbus); }
+.badge-bacnet { color: var(--color-bacnet); border-color: var(--color-bacnet); }
+
+.badge-ro {
+    font-size: 11px; /* Agrandissement Badge Read Only */
+    font-weight: 700;
+    color: var(--text-dim);
+    border: 1px solid var(--border-color);
+    padding: 1px 5px;
+    border-radius: 2px;
+    white-space: nowrap;
+}
+
+/* ==============================================================================
+   VALUE DISPLAY — ISA 101 "screen" surface
+   ============================================================================== */
+
+.value-display {
+    background: var(--bg-screen);
+    border: 1px solid var(--border-color);
+    border-radius: 2px;
+    padding: 12px;
+    min-height: 52px;
+    flex: 1;
+    /* Prevent content from overflowing the card */
+    overflow: hidden;
+}
+
+.value-wrapper {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-width: 0;
+}
+
+/* Large numeric readout */
+.value-text {
+    font-size: 28px;
+    font-weight: 300;
+    display: flex;
+    align-items: center;
+    color: var(--text-main);
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.unit {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-left: 5px;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+/* Binary state indicator (ISA: coloured only for state, not decoration) */
+.indicator-square {
+    width: 13px;
+    height: 13px;
+    margin-right: 8px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+.state-run  { background-color: var(--color-run); }
 .state-stop { background-color: var(--color-stop); }
 
 /* ==============================================================================
-   GAUGES & THERMOMETERS (Flat 2D rendering)
+   WRITE CONTROLS — BELOW VALUE DISPLAY
+   ISA 101: clearly an "action" element, distinct from display surface.
    ============================================================================== */
-.gauge-container { width: 100%; height: 12px; background-color: var(--border-color); margin-top: 16px; clip-path: polygon(0 100%, 100% 100%, 100% 0); }
-.gauge-fill { height: 100%; background-color: var(--color-bar); transition: width 0.3s ease; }
 
-.thermo-vertical { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 42px; margin-left: 10px; }
-.thermo-tube-v { width: 8px; height: 100%; background-color: var(--border-color); border-radius: 4px 4px 0 0; display: flex; flex-direction: column; justify-content: flex-end; z-index: 1; }
-.thermo-fill-v { width: 100%; background-color: var(--color-temp); border-radius: 4px 4px 0 0; transition: height 0.3s ease; }
-.thermo-bulb-v { width: 18px; height: 18px; background-color: var(--color-temp); border-radius: 50%; margin-top: -4px; z-index: 2; }
+.write-control { margin-top: 10px; overflow: hidden; }
+
+/* Binary write toggle */
+.write-toggle {
+    width: 100%;
+    padding: 6px 0;
+    border: 1px solid var(--border-color);
+    border-radius: 2px;
+    background: var(--bg-body);
+    color: var(--text-dim);
+    font-size: 12px;
+    font-weight: 700;
+    font-family: inherit;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+.write-toggle:hover        { border-color: var(--color-bar); color: var(--color-bar); }
+.write-toggle.is-run       { border-color: var(--color-run); color: var(--color-run); }
+.write-toggle.is-run:hover { background: var(--color-run);   color: var(--text-inv);  }
+
+/* Analog write slider */
+.write-slider {
+    width: 100%;
+    margin-top: 6px;
+    accent-color: var(--color-bar);
+    cursor: pointer;
+}
 
 /* ==============================================================================
-   MODAL (POP-UP) FOR NETWORK CONFIGURATION
+   EDIT CONTROLS — CARD FOOTER (visible only in edit mode)
+   Placed at the bottom to keep the header area uncluttered.
    ============================================================================== */
-.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: none; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(3px);}
-.modal-box { background: var(--bg-card); border: 1px solid var(--border-color); padding: 32px; max-width: 500px; width: 90%; border-radius: 6px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-.modal-title { font-size: 18px; font-weight: bold; color: var(--text-main); margin-bottom: 20px; text-transform: uppercase; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; }
-.modal-body { font-size: 14px; color: var(--text-dim); margin-bottom: 28px; line-height: 1.6; }
-.modal-actions { display: flex; justify-content: flex-end; gap: 12px; }
 
-.warning-text { color: var(--color-temp); font-weight: 600; margin-top: 15px; display: block;}
-.input-row { display: flex; gap: 10px; margin-top: 10px; align-items: center;}
-.input-field { flex: 1; padding: 10px; background-color: var(--bg-screen); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px; font-family: inherit; font-size: 14px; }
+.edit-controls {
+    display: none;          /* Revealed by .edit-active below */
+    justify-content: space-between;
+    gap: 6px;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border-color);
+}
+
+/* Reveal edit controls and hide write sliders while in edit mode */
+.edit-active .edit-controls { display: flex; }
+.edit-active .write-control { display: none; }
+
+/* Small card-level action buttons */
+.btn-card-action {
+    flex: 1;
+    padding: 5px 6px;
+    border: 1px solid var(--border-color);
+    border-radius: 2px;
+    background: var(--bg-body);
+    color: var(--text-dim);
+    font-size: 12px; /* Agrandissement bouton édition carte */
+    font-weight: 700;
+    font-family: inherit;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.btn-card-action.config:hover {
+    border-color: var(--color-edit);
+    color: var(--color-edit);
+}
+.btn-card-action.delete:hover {
+    border-color: var(--color-danger);
+    color: var(--color-danger);
+}
+
+/* ==============================================================================
+   GAUGES & THERMOMETERS
+   ============================================================================== */
+
+.gauge-container {
+    width: 100%;
+    height: 6px;
+    background: var(--border-color);
+    margin-top: 10px;
+    border-radius: 1px;
+    overflow: hidden;
+}
+.gauge-fill {
+    height: 100%;
+    background: var(--color-bar);
+    transition: width 0.35s ease;
+}
+
+.thermo-vertical {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    height: 40px;
+    margin-left: 8px;
+    flex-shrink: 0;
+}
+.thermo-tube-v {
+    width: 6px;
+    height: 100%;
+    background: var(--border-color);
+    border-radius: 3px 3px 0 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    z-index: 1;
+}
+.thermo-fill-v {
+    width: 100%;
+    background: var(--color-temp);
+    border-radius: 3px 3px 0 0;
+    transition: height 0.35s ease;
+}
+.thermo-bulb-v {
+    width: 14px;
+    height: 14px;
+    background: var(--color-temp);
+    border-radius: 50%;
+    margin-top: -3px;
+    z-index: 2;
+}
+
+/* ==============================================================================
+   DRAG & DROP — SORTABLEJS STATES
+   ============================================================================== */
+
+.section-ghost {
+    opacity: 0.3;
+    border-color: var(--border-edit) !important;
+    border-style: dashed !important;
+}
+
+.card-ghost {
+    opacity: 0.25;
+    border-color: var(--color-bar) !important;
+    background: var(--bg-body) !important;
+}
+
+.section-placeholder,
+.card-placeholder {
+    border: 2px dashed var(--border-edit);
+    border-radius: 3px;
+    background: transparent;
+    /* Minimum height so the placeholder is visible as a drop zone */
+    min-height: 40px;
+}
+
+.section-chosen { box-shadow: var(--shadow-drag); z-index: 10; }
+.card-chosen    { box-shadow: var(--shadow-drag); z-index: 10; }
+
+/* ==============================================================================
+   MODALS
+   ============================================================================== */
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.78);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+    padding: 20px;
+}
+.modal-overlay.open { display: flex; }
+
+.modal-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    padding: 32px;               /* Plus d'espace à l'intérieur */
+    width: 100%;
+    max-width: 500px;            /* Élargi de 460px à 500px */
+    border-radius: 3px;
+    box-shadow: var(--shadow-modal);
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+/* Wider variant for the point configuration modal */
+.modal-wide { max-width: 680px; }
+
+/* Network modal — slightly wider than the default */
+.modal-net  { max-width: 580px; }
+
+.modal-title {
+    font-size: 17px;             /* Agrandissement Titre Modal */
+    font-weight: 700;
+    color: var(--text-main);
+    margin-bottom: 20px;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 12px;
+    letter-spacing: 1.5px;
+}
+
+.modal-body {
+    font-size: 14px;             /* Agrandissement Texte Modal */
+    color: var(--text-dim);
+    margin-bottom: 22px;
+    line-height: 1.65;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* ==============================================================================
+   NETWORK MODAL — STA / AP MODE SELECTOR
+   Two clearly-separated panels, one per network mode.
+   ============================================================================== */
+
+.net-mode-selector {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 18px;
+}
+
+.net-mode-btn {
+    padding: 16px 10px;          /* Boutons réseau plus hauts */
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    background: var(--bg-screen);
+    color: var(--text-dim);
+    font-size: 13px;             /* Agrandissement Bouton STA/AP */
+    font-weight: 700;
+    font-family: inherit;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    transition: border-color 0.15s ease, color 0.15s ease;
+}
+.net-mode-btn svg { opacity: 0.5; transition: opacity 0.15s; }
+.net-mode-btn:hover { border-color: var(--color-bar); color: var(--color-bar); }
+.net-mode-btn:hover svg { opacity: 0.9; }
+.net-mode-btn.active {
+    border-color: var(--color-bar);
+    color: var(--color-bar);
+    background: var(--bg-body);
+}
+.net-mode-btn.active svg { opacity: 1; }
+
+.net-mode-btn span {
+    font-size: 11px !important;  /* Agrandissement sous-texte STA/AP */
+}
+
+.net-form-panel {
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+}
+.net-form-panel.visible { display: flex; }
+
+.net-warning {
+    color: var(--color-temp);
+    font-size: 13px;             /* Agrandissement texte warning */
+    font-weight: 600;
+    margin-top: 14px;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    line-height: 1.5;
+}
+.net-warning svg { flex-shrink: 0; margin-top: 1px; }
+
+/* ==============================================================================
+   FORM ELEMENTS
+   ============================================================================== */
+
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+
+.form-label {
+    font-size: 11px;             /* Agrandissement labels config */
+    font-weight: 700;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.form-hint {
+    font-size: 10px;
+    font-weight: 400;
+    color: var(--text-dim);
+    margin-left: 4px;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.form-section-title {
+    font-size: 11px;             /* Agrandissement titre section modale */
+    font-weight: 700;
+    color: var(--text-dim);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 5px;
+    margin-bottom: 8px;
+}
+
+.input-field {
+    padding: 10px 12px;          /* Champs plus hauts pour saisie agréable */
+    background: var(--bg-screen);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+    border-radius: 2px;
+    font-family: inherit;
+    font-size: 14px;             /* Agrandissement texte input */
+    outline: none;
+    transition: border-color 0.15s ease;
+    width: 100%;
+}
+.input-field:focus { border-color: var(--color-bar); }
+
+/* Input with inline validation status icon */
+.input-with-status {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.input-with-status .input-field { padding-right: 26px; }
+
+.addr-status {
+    position: absolute;
+    right: 7px;
+    font-size: 12px;
+    pointer-events: none;
+    font-weight: 700;
+}
+.addr-status.ok    { color: var(--color-run);  }
+.addr-status.error { color: var(--color-stop); }
+
+/* Protocol toggle checkboxes (checkbox hidden; styled label acts as toggle) */
+.proto-toggles {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.proto-toggle {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+.proto-toggle input[type="checkbox"] { display: none; }
+
+.proto-badge {
+    font-size: 12px;             /* Agrandissement Badge modale */
+    font-weight: 700;
+    padding: 6px 12px;           /* Plus cliquable */
+    border-radius: 2px;
+    border: 1px solid var(--border-color);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    letter-spacing: 0.4px;
+    user-select: none;
+    text-transform: uppercase;
+}
+
+.proto-toggle input:checked + .proto-modbus {
+    background: var(--color-modbus);
+    border-color: var(--color-modbus);
+    color: var(--text-inv);
+}
+.proto-toggle input:checked + .proto-bacnet {
+    background: var(--color-bacnet);
+    border-color: var(--color-bacnet);
+    color: var(--text-inv);
+}
+.proto-toggle input:checked + .proto-write {
+    background: var(--color-bar);
+    border-color: var(--color-bar);
+    color: var(--text-inv);
+}
+
+/* Column-width picker (section modal) */
+.col-picker {
+    display: flex;
+    gap: 6px;
+}
+.col-opt {
+    flex: 1;
+    padding: 10px 0;             /* Boutons de largeur plus gros */
+    border: 1px solid var(--border-color);
+    border-radius: 2px;
+    background: var(--bg-screen);
+    color: var(--text-dim);
+    font-size: 14px;             /* Agrandissement texte largeur de colonnes */
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-align: center;
+}
+.col-opt:hover  { border-color: var(--color-edit); color: var(--color-edit); }
+.col-opt.active { background: var(--color-edit); border-color: var(--color-edit); color: var(--text-inv); }
+
+/* Inline error message in modals */
+.form-error {
+    color: var(--color-stop);
+    font-size: 12px;
+    font-weight: 600;
+    margin-top: 10px;
+    min-height: 16px;
+}
+
+/* Misc inline row layout (scan button + select) */
+.input-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    align-items: center;
+}
+
+/* ==============================================================================
+   SECTION WIDTH UTILITIES — STRICT FLEX SIZING
+   flex-grow/shrink set to 0 on .section-card; only basis varies here.
+   The gap inside #sectionsRoot is 18px.
+   ============================================================================== */
+
+.section-cols-1 { flex-basis: calc(25%  - 14px); }
+.section-cols-2 { flex-basis: calc(50%  - 9px);  }
+.section-cols-3 { flex-basis: calc(75%  - 5px);  }
+.section-cols-4 { flex-basis: 100%; }
+
+/* ==============================================================================
+   REBOOT / RECONNECT OVERLAY
+   ============================================================================== */
+
+.reboot-overlay-box {
+    text-align: center;
+    padding: 10px 0;
+}
+
+.reboot-overlay-box h2 {
+    color: var(--color-temp);
+    font-size: 16px;
+    margin: 0 0 12px;
+    letter-spacing: 1px;
+}
+
+.reboot-overlay-box p {
+    margin: 6px 0;
+    font-size: 13px;
+}
+
+/* ==============================================================================
+   SITE FOOTER — "Made by Doodz" signature
+   ============================================================================== */
+
+.site-footer {
+    position: fixed;
+    bottom: 8px;
+    right: 14px;
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 0.3px;
+    opacity: 0.55;
+    transition: opacity 0.2s ease;
+    z-index: 50;
+    font-style: italic;
+    pointer-events: auto;
+}
+
+.site-footer:hover { opacity: 1; }
+
+.site-footer a {
+    color: var(--color-bar);
+    text-decoration: none;
+    font-weight: 700;
+    font-style: normal;
+}
+.site-footer a:hover { text-decoration: underline; }
+
+/* ==============================================================================
+   RESPONSIVE — TABLET (≤ 900 px)
+   ============================================================================== */
+
+@media (max-width: 900px) {
+    .top-right        { gap: 8px; }
+    .ip-block,
+    .protocols        { display: none; }
+
+    /* All sections go full-width on narrow screens */
+    .section-cols-1,
+    .section-cols-2,
+    .section-cols-3,
+    .section-cols-4   { flex-basis: 100%; }
+
+    .form-grid        { grid-template-columns: 1fr; }
+    .net-mode-selector { grid-template-columns: 1fr; }
+}

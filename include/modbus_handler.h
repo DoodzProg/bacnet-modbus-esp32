@@ -1,9 +1,11 @@
 /**
- * @file modbus_handler.h
- * @brief Modbus TCP Server (Slave) stack declarations.
- * @details Synchronizes Modbus registers (Coils/Holding) with the global state structure.
- * @author [Your Name / Project Name]
- * @date 2024
+ * @file        modbus_handler.h
+ * @brief       Modbus TCP Server (Slave) stack declarations.
+ * @details     Synchronizes Modbus registers (Coils/Holding) with the global state structure.
+ * @author      Doodz (DoodzProg)
+ * @date        2026-04-04
+ * @version     1.0.0
+ * @repository  https://github.com/DoodzProg/ESP32-BMS-Gateway-Multi-Protocol
  */
 
 #pragma once

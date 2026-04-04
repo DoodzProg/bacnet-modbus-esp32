@@ -1,9 +1,11 @@
 /**
- * @file bacnet_handler.h
- * @brief BACnet/IP protocol handler and dynamic binding declarations.
- * @details Exposes the global state as BACnet objects and intercepts write requests.
- * @author [Your Name / Project Name]
- * @date 2024
+ * @file        bacnet_handler.h
+ * @brief       BACnet/IP protocol handler and dynamic binding declarations.
+ * @details     Exposes the global state as BACnet objects and intercepts write requests.
+ * @author      Doodz (DoodzProg)
+ * @date        2026-04-04
+ * @version     1.0.0
+ * @repository  https://github.com/DoodzProg/ESP32-BMS-Gateway-Multi-Protocol
  */
 
 #pragma once

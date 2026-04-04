@@ -1,0 +1,77 @@
+<!--
+==============================================================================
+@file        index.html
+@brief       ESP Web Tools Installation Page for the BMS Gateway.
+@details     Provides a one-click firmware installation experience directly from the browser using the Web Serial API.
+@author      Doodz (DoodzProg)
+@date        2026-04-04
+@version     1.0.0
+@repository  https://github.com/DoodzProg/ESP32-BMS-Gateway-Multi-Protocol
+==============================================================================
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Install BMS Gateway</title>
+    <style>
+        body {
+            background-color: #0f0f0f;
+            color: #d8d8d8;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background-color: #191919;
+            padding: 40px;
+            border-radius: 8px;
+            border: 1px solid #2e2e2e;
+            text-align: center;
+            max-width: 500px;
+            box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+        }
+        h1 { color: #ffffff; letter-spacing: 1px; }
+        p { line-height: 1.6; color: #888888; }
+        .instructions {
+            background: #222222;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: left;
+            font-size: 13px;
+            margin-bottom: 25px;
+            border-left: 3px solid #00acc1;
+        }
+        /* Importation du script magique ESP Web Tools */
+    </style>
+    <script type="module" src="https://unpkg.com/esp-web-tools@9.4.2/dist/web/install-button.js?module"></script>
+</head>
+<body>
+
+    <div class="container">
+        <h1>BMS Gateway v1.0.0</h1>
+        <p>Industrial Modbus TCP to BACnet/IP Gateway</p>
+        
+        <div class="instructions">
+            <b>Installation Guide:</b><br><br>
+            1. Connect your ESP32-S3 (8MB Flash minimum) to your PC via USB.<br>
+            2. Click the Connect button below.<br>
+            3. Select your USB serial port from the pop-up menu.<br>
+            4. Click "Install BMS Gateway" and wait for the process to complete.
+        </div>
+
+        <esp-web-install-button manifest="manifest.json"></esp-web-install-button>
+        
+        <p style="margin-top: 25px; font-size: 11px;">
+            Supported browsers: Google Chrome, Microsoft Edge.<br>
+            Made by Doodz
+        </p>
+    </div>
+
+</body>
+</html>
