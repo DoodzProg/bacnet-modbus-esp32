@@ -22,7 +22,7 @@
 
   @author      Doodz (DoodzProg)
   @date        2026-04-04
-  @version     1.0.0
+  @version     1.1.0
   @repository  https://github.com/DoodzProg/ESP32-BMS-Gateway-Multi-Protocol
 ============================================================================== -->
 
@@ -35,6 +35,17 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+    <!-- Password change banner — shown when default password is still active -->
+    <div id="pwdBanner" class="pwd-banner" style="display:none">
+        <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor"
+             stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+        Default password still active — change it before deploying on a shared network.
+        <button onclick="openNetModal()">Change Password</button>
+    </div>
 
     <!-- ======================================================================
          TOP NAVIGATION BAR
@@ -51,7 +62,7 @@
                    rel="noopener noreferrer"
                    class="title-ver-link"
                    title="View repository on GitHub">
-                    <span class="title-ver">v1.0.1</span>
+                    <span class="title-ver">v1.1.0</span>
                     <!-- GitHub mark SVG (official, monochromatic) -->
                     <svg class="github-mark" viewBox="0 0 98 96" xmlns="http://www.w3.org/2000/svg" aria-label="GitHub">
                         <path fill-rule="evenodd" clip-rule="evenodd"
@@ -420,7 +431,7 @@
             <div class="modal-title" id="netModalTitle">Network Configuration</div>
             <div class="modal-body" id="netModalBody"></div>
             <div class="modal-actions" id="netModalActions">
-                <button class="btn btn-cancel" onclick="closeNetModal()">Cancel</button>
+                <button class="btn btn-cancel" onclick="closeNetModal()">Close</button>
                 <button class="btn btn-confirm" id="netModalConfirmBtn">Apply</button>
             </div>
         </div>

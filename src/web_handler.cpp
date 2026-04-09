@@ -7,7 +7,7 @@
  * (point creation, deletion, value writes, layout changes) are immediately
  * persisted to /config.json via state_save_to_json() to survive hard resets.
  *
- * ### API Surface (v1.0.1)
+ * ### API Surface (v1.1.0)
  *
  * | Method | Endpoint              | Description                                      |
  * |--------|-----------------------|--------------------------------------------------|
@@ -21,15 +21,18 @@
  * | POST   | /api/point/write      | Write a live value to a point                    |
  * | GET    | /api/point/check      | Validate address availability before committing  |
  * | GET    | /api/scan             | Scan surrounding Wi-Fi networks                  |
- * | GET    | /api/switch_network   | Persist network credentials and reboot           |
+ * | POST   | /api/switch_network   | Persist network credentials and reboot (JSON body) |
+ * | POST   | /api/auth/change      | Change web UI password (SHA-256 stored in NVS)   |
+ * | POST   | /api/device/name      | Set device name (mDNS hostname + AP SSID)         |
  *
  * @author      Doodz (DoodzProg)
- * @date        2026-04-04
- * @version     1.0.1
+ * @date        2026-04-09
+ * @version     1.1.0
  * @repository  https://github.com/DoodzProg/ESP32-BMS-Gateway-Multi-Protocol
  */
 
 #include "web_handler.h"
+#include "config.h"
 #include "state.h"
 #include "secrets.h"
 #include <WebServer.h>
@@ -37,6 +40,8 @@
 #include <Preferences.h>
 #include <LittleFS.h>
 #include <ArduinoJson.h>
+#include "mbedtls/md.h"
+#include "mbedtls/base64.h"
 
 // ==============================================================================
 // PROTOCOL SYNCHRONIZATION EXTERNS
@@ -67,6 +72,7 @@
 
 extern const char* AP_SSID;
 extern const char* AP_PASS;
+extern bool g_isAPMode;  // Set by main.cpp; true when device is in AP/captive-portal mode
 
 WebServer server(80);
 
@@ -74,6 +80,89 @@ WebServer server(80);
  * @details Prevents watchdog crashes by avoiding ESP.restart() inside async web requests. 
  */
 volatile bool pendingReboot = false;
+
+// ==============================================================================
+// SECURITY HELPERS
+// ==============================================================================
+
+/**
+ * @brief Computes the SHA-256 hex digest of a string.
+ * @param  input  Plain-text string to hash.
+ * @return 64-character lowercase hex string.
+ */
+static String _sha256(const String& input) {
+    unsigned char hash[32];
+    mbedtls_md_context_t ctx;
+    mbedtls_md_init(&ctx);
+    mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), 0);
+    mbedtls_md_starts(&ctx);
+    mbedtls_md_update(&ctx, (const unsigned char*)input.c_str(), input.length());
+    mbedtls_md_finish(&ctx, hash);
+    mbedtls_md_free(&ctx);
+    String hex = "";
+    for (int i = 0; i < 32; i++) {
+        char buf[3];
+        sprintf(buf, "%02x", hash[i]);
+        hex += buf;
+    }
+    return hex;
+}
+
+/**
+ * @brief Enforces HTTP Basic Authentication on the current request.
+ * @details Skipped entirely in AP mode (captive portal — physical proximity
+ *          implies installer access). In STA mode, decodes the Authorization
+ *          header, hashes the supplied password with SHA-256, and compares it
+ *          with the hash stored in NVS (namespace "bms-auth", key "web_hash").
+ *          If no hash is stored yet, the default password DEFAULT_WEB_PASS is used.
+ * @return true if the request is authorised; false if a 401 was already sent.
+ */
+static bool _check_auth() {
+    if (g_isAPMode) return true;  // No auth in AP/captive-portal mode
+
+    String authHeader = server.header("Authorization");
+    if (!authHeader.startsWith("Basic ")) {
+        server.sendHeader("WWW-Authenticate", "Basic realm=\"BMS Gateway\"");
+        server.send(401, "text/plain", "Unauthorized");
+        return false;
+    }
+
+    // Decode base64 credentials
+    String b64 = authHeader.substring(6);
+    unsigned char decoded[128] = {0};
+    size_t decodedLen = 0;
+    if (mbedtls_base64_decode(decoded, sizeof(decoded) - 1, &decodedLen,
+            (const unsigned char*)b64.c_str(), b64.length()) != 0) {
+        server.sendHeader("WWW-Authenticate", "Basic realm=\"BMS Gateway\"");
+        server.send(401, "text/plain", "Unauthorized");
+        return false;
+    }
+
+    // Split "user:password" — we only check the password for now
+    String credentials = String((char*)decoded);
+    int colonIdx = credentials.indexOf(':');
+    if (colonIdx < 0) {
+        server.sendHeader("WWW-Authenticate", "Basic realm=\"BMS Gateway\"");
+        server.send(401, "text/plain", "Unauthorized");
+        return false;
+    }
+    String pass = credentials.substring(colonIdx + 1);
+
+    // Compare SHA-256 of supplied password with stored hash
+    Preferences pref;
+    pref.begin("bms-auth", false);  // false = create namespace if missing (avoids NOT_FOUND spam)
+    String storedHash = pref.isKey("web_hash")
+        ? pref.getString("web_hash")
+        : _sha256(String(DEFAULT_WEB_PASS));
+    pref.end();
+
+    if (_sha256(pass) != storedHash) {
+        server.sendHeader("WWW-Authenticate", "Basic realm=\"BMS Gateway\"");
+        server.send(401, "text/plain", "Unauthorized");
+        return false;
+    }
+    return true;
+}
 
 // ==============================================================================
 // INTERNAL UTILITIES
@@ -126,6 +215,7 @@ static void _remove_point_from_sections(const char* pointName) {
 
 /** @brief Sends live telemetry (current values + RAM stats) for all configured points. */
 void handleData() {
+    if (!_check_auth()) return;
     String json = "{";
 
     uint32_t freeRam  = ESP.getFreeHeap();
@@ -164,25 +254,40 @@ void handleData() {
 // GET /api/system — Network Configuration
 // ==============================================================================
 
-/** @brief Returns current network configuration, active mode, and device/client IP addresses. */
+/** @brief Returns current network configuration, active mode, device/client IP addresses, and auth status. */
 void handleSystem() {
-    Preferences pref;
-    pref.begin("bms-app", true);
+    if (!_check_auth()) return;
 
-    String currentSTA     = pref.isKey("sta_ssid") ? pref.getString("sta_ssid") : String(WIFI_SSID);
-    String currentSTAPass = pref.isKey("sta_pass") ? pref.getString("sta_pass") : String(WIFI_PASS);
-    String currentAP      = pref.isKey("ap_ssid")  ? pref.getString("ap_ssid")  : String(AP_SSID);
-    String currentAPPass  = pref.isKey("ap_pass")  ? pref.getString("ap_pass")  : String(AP_PASS);
+    // Single NVS read — all keys from the same namespace in one pass
+    Preferences pref;
+    pref.begin("bms-app", false);
+    String currentSTA  = pref.isKey("sta_ssid")    ? pref.getString("sta_ssid")    : String(WIFI_SSID);
+    String currentSTP  = pref.isKey("sta_pass")    ? pref.getString("sta_pass")    : String(WIFI_PASS);
+    String currentAP   = pref.isKey("ap_ssid")     ? pref.getString("ap_ssid")     : String(AP_SSID);
+    String currentAP_P = pref.isKey("ap_pass")     ? pref.getString("ap_pass")     : String(AP_PASS);
+    String devName     = pref.isKey("device_name") ? pref.getString("device_name") : String(DEFAULT_DEVICE_NAME);
     pref.end();
 
+    // Auth namespace (separate partition — open read-write to auto-create if first boot)
+    Preferences prefAuth;
+    prefAuth.begin("bms-auth", false);
+    bool pwdChanged = prefAuth.getBool("pwd_changed", false);
+    prefAuth.end();
+
+    String espIP = (WiFi.getMode() == WIFI_AP)
+        ? WiFi.softAPIP().toString()
+        : WiFi.localIP().toString();
+
     String json = "{";
-    json += "\"isAP\":"      + String(WiFi.getMode() == WIFI_AP ? "true" : "false") + ",";
-    json += "\"staSSID\":\"" + currentSTA      + "\",";
-    json += "\"staPASS\":\"" + currentSTAPass  + "\",";
-    json += "\"apSSID\":\""  + currentAP       + "\",";
-    json += "\"apPASS\":\""  + currentAPPass   + "\",";
-    json += "\"clientIP\":\"" + server.client().remoteIP().toString() + "\",";
-    json += "\"espIP\":\""   + (WiFi.getMode() == WIFI_AP ? WiFi.softAPIP().toString() : WiFi.localIP().toString()) + "\"";
+    json += "\"isAP\":"             + String(WiFi.getMode() == WIFI_AP ? "true" : "false") + ",";
+    json += "\"staSSID\":\""        + currentSTA  + "\",";
+    json += "\"staPASS\":\""        + currentSTP  + "\",";
+    json += "\"apSSID\":\""         + currentAP   + "\",";
+    json += "\"apPASS\":\""         + currentAP_P + "\",";
+    json += "\"clientIP\":\""       + server.client().remoteIP().toString() + "\",";
+    json += "\"espIP\":\""          + espIP + "\",";
+    json += "\"deviceName\":\""     + devName + "\",";
+    json += "\"defaultPwdActive\":" + String(!pwdChanged ? "true" : "false");
     json += "}";
 
     server.send(200, "application/json", json);
@@ -194,6 +299,7 @@ void handleSystem() {
 
 /** @brief Exports the complete point definition list and dashboard section layout as JSON. */
 void handleGetConfig() {
+    if (!_check_auth()) return;
     DynamicJsonDocument doc(8192);
 
     JsonArray binArr = doc.createNestedArray("binary");
@@ -241,6 +347,7 @@ void handleGetConfig() {
 
 /** @brief Persists a new dashboard section order and column sizes from the web UI to LittleFS. */
 void handlePostLayout() {
+    if (!_check_auth()) return;
     DynamicJsonDocument doc(4096);
     if (!_parse_body(doc)) return;
 
@@ -273,6 +380,7 @@ void handlePostLayout() {
 // ==============================================================================
 
 void handleAddPoint() {
+    if (!_check_auth()) return;
     DynamicJsonDocument doc(1024);
     if (!_parse_body(doc)) return;
 
@@ -390,6 +498,7 @@ void handleAddPoint() {
 
 /** @brief Updates metadata (name, Modbus address, BACnet instance, scale, protocol) for an existing point. */
 void handleUpdatePoint() {
+    if (!_check_auth()) return;
     DynamicJsonDocument doc(1024);
     if (!_parse_body(doc)) return;
 
@@ -471,6 +580,7 @@ void handleUpdatePoint() {
 
 /** @brief Removes a named point from the state registry and all dashboard sections, then persists the change. */
 void handleDeletePoint() {
+    if (!_check_auth()) return;
     DynamicJsonDocument doc(256);
     if (!_parse_body(doc)) return;
 
@@ -513,11 +623,12 @@ void handleDeletePoint() {
 
 /**
  * @brief Writes a new live value to an existing writable point.
- * @details CRITICAL FIX: Immediately propagates the web-originated write to 
- * Modbus and BACnet stacks to prevent race conditions where the fast-running 
+ * @details CRITICAL FIX: Immediately propagates the web-originated write to
+ * Modbus and BACnet stacks to prevent race conditions where the fast-running
  * read loops overwrite the RAM with stale bus data.
  */
 void handleWritePoint() {
+    if (!_check_auth()) return;
     DynamicJsonDocument doc(256);
     if (!_parse_body(doc)) return;
 
@@ -586,6 +697,7 @@ void handleWritePoint() {
 
 /** @brief Validates Modbus and BACnet address availability before committing a new or updated point. */
 void handleCheckAddress() {
+    if (!_check_auth()) return;
     String type = server.arg("type");
     bool modbusOk = true;
     bool bacnetOk = true;
@@ -651,32 +763,130 @@ void handleScan() {
 }
 
 // ==============================================================================
-// GET /api/switch_network — Credential Persist & Reboot
+// POST /api/switch_network — Credential Persist & Reboot
 // ==============================================================================
 
-/** @brief Persists new network credentials (STA or AP mode) to NVRAM and triggers a safe reboot. */
+/**
+ * @brief Persists new network credentials (STA or AP mode) to NVRAM and triggers a safe reboot.
+ * @details Credentials are transmitted in the JSON body — never in URL query strings.
+ *          Body (STA): {"mode":"wifi",  "ssid":"<ssid>", "pass":"<pass>"}
+ *          Body (AP):  {"mode":"local", "ap_ssid":"<ssid>", "ap_pass":"<pass>"}
+ */
 void handleSwitchNetwork() {
-    String mode = server.arg("mode");
+    if (!_check_auth()) return;
+    DynamicJsonDocument doc(512);
+    if (!_parse_body(doc)) return;
+
+    const char* mode = doc["mode"] | "";
     Preferences pref;
     pref.begin("bms-app", false);
 
-    if (mode == "local") {
+    if (strcmp(mode, "local") == 0) {
         pref.putBool("force_ap", true);
-        if (server.hasArg("ap_ssid") && server.arg("ap_ssid").length() > 0)
-            pref.putString("ap_ssid", server.arg("ap_ssid"));
-        if (server.hasArg("ap_pass") && server.arg("ap_pass").length() >= 8)
-            pref.putString("ap_pass", server.arg("ap_pass"));
+        const char* apSsid = doc["ap_ssid"] | "";
+        const char* apPass = doc["ap_pass"] | "";
+        if (strlen(apSsid) > 0)  pref.putString("ap_ssid", apSsid);
+        if (strlen(apPass) >= 8) pref.putString("ap_pass", apPass);
     } else {
         pref.putBool("force_ap", false);
-        if (server.hasArg("ssid") && server.arg("ssid").length() > 0)
-            pref.putString("sta_ssid", server.arg("ssid"));
-        if (server.hasArg("pass"))
-            pref.putString("sta_pass", server.arg("pass"));
+        const char* ssid = doc["ssid"] | "";
+        const char* pass = doc["pass"] | "";
+        if (strlen(ssid) > 0) pref.putString("sta_ssid", ssid);
+        pref.putString("sta_pass", pass);
     }
     pref.end();
 
-    server.send(200, "text/plain", "Rebooting...");
+    server.send(200, "application/json", "{\"status\":\"rebooting\"}");
     pendingReboot = true;
+}
+
+// ==============================================================================
+// POST /api/auth/change — Change Web UI Password
+// ==============================================================================
+
+/**
+ * @brief Changes the web UI password.
+ * @details Verifies the current password, then stores the SHA-256 hash of the
+ *          new password in NVS (namespace "bms-auth", key "web_hash").
+ *          Sets "pwd_changed" to true so the dashboard banner disappears.
+ *          Body: {"currentPassword": "...", "newPassword": "..."}
+ */
+void handleChangeAuth() {
+    if (!_check_auth()) return;
+    DynamicJsonDocument doc(512);
+    if (!_parse_body(doc)) return;
+
+    const char* current = doc["currentPassword"] | "";
+    const char* newPwd  = doc["newPassword"]     | "";
+
+    if (strlen(current) == 0 || strlen(newPwd) == 0) {
+        _send_error(400, "currentPassword and newPassword required"); return;
+    }
+    if (strlen(newPwd) < 8) {
+        _send_error(400, "New password must be at least 8 characters"); return;
+    }
+
+    // Verify current password against stored hash
+    Preferences pref;
+    pref.begin("bms-auth", false);
+    String storedHash = pref.isKey("web_hash")
+        ? pref.getString("web_hash")
+        : _sha256(String(DEFAULT_WEB_PASS));
+
+    if (_sha256(String(current)) != storedHash) {
+        pref.end();
+        _send_error(403, "Current password is incorrect"); return;
+    }
+
+    pref.putString("web_hash", _sha256(String(newPwd)));
+    pref.putBool("pwd_changed", true);
+    pref.end();
+
+    server.send(200, "application/json", "{\"ok\":true}");
+}
+
+// ==============================================================================
+// POST /api/device/name — Set Device Name
+// ==============================================================================
+
+/**
+ * @brief Persists a new device name to NVS and triggers a safe reboot.
+ * @details The device name determines the mDNS hostname (bms-<name>.local)
+ *          and the AP SSID (BMS-GW-<NAME>) after the next reboot.
+ *          Body: {"name": "hvac-ahu-01"}
+ */
+void handleSetDeviceName() {
+    if (!_check_auth()) return;
+    DynamicJsonDocument doc(256);
+    if (!_parse_body(doc)) return;
+
+    const char* name = doc["name"] | "";
+    if (strlen(name) == 0 || strlen(name) > 32) {
+        _send_error(400, "name must be 1–32 characters"); return;
+    }
+
+    Preferences pref;
+    pref.begin("bms-app", false);
+    pref.putString("device_name", name);
+    pref.end();
+
+    server.send(200, "application/json", "{\"ok\":true}");
+    pendingReboot = true;
+}
+
+// ==============================================================================
+// CAPTIVE PORTAL — OS Detection Redirects (AP mode only)
+// ==============================================================================
+
+/** @brief Redirects captive portal detection requests to the dashboard (AP mode only).
+ *         In STA mode, returns 204 No Content to silence browser probes silently. */
+static void _handle_captive_redirect() {
+    if (g_isAPMode) {
+        server.sendHeader("Location", "http://192.168.4.1/", true);
+        server.send(302, "text/plain", "");
+    } else {
+        server.send(204);  // No Content — silences browser probes without logging errors
+    }
 }
 
 // ==============================================================================
@@ -691,6 +901,10 @@ void web_server_init() {
     Serial.println("[WEB] LittleFS mounted.");
 
     state_load_from_json();
+
+    // Enable Authorization header collection for Basic Auth
+    const char* authHeaders[] = {"Authorization"};
+    server.collectHeaders(authHeaders, 1);
 
     server.serveStatic("/",          LittleFS, "/index.html");
     server.serveStatic("/style.css", LittleFS, "/style.css");
@@ -707,8 +921,28 @@ void web_server_init() {
     server.on("/api/point/write",    HTTP_POST, handleWritePoint);
     server.on("/api/point/check",    HTTP_GET,  handleCheckAddress);
 
-    server.on("/api/scan",           handleScan);
-    server.on("/api/switch_network", handleSwitchNetwork);
+    server.on("/api/scan",            handleScan);
+    server.on("/api/switch_network",  HTTP_POST, handleSwitchNetwork);
+    server.on("/api/auth/change",     HTTP_POST, handleChangeAuth);
+    server.on("/api/device/name",     HTTP_POST, handleSetDeviceName);
+
+    // Captive portal: intercept OS detection URLs and redirect to dashboard
+    server.on("/generate_204",        _handle_captive_redirect);  // Android
+    server.on("/hotspot-detect.html", _handle_captive_redirect);  // iOS / macOS
+    server.on("/connecttest.txt",     _handle_captive_redirect);  // Windows
+
+    // Silence common browser auto-probes (favicon, touch icon, manifest…).
+    // Without these, the Arduino WebServer lib logs a spurious "request handler
+    // not found" error at log_e level even though onNotFound handles them fine.
+    auto _no_content = []() { server.send(204); };
+    server.on("/favicon.ico",                      HTTP_GET, _no_content);
+    server.on("/apple-touch-icon.png",             HTTP_GET, _no_content);
+    server.on("/apple-touch-icon-precomposed.png", HTTP_GET, _no_content);
+    server.on("/manifest.json",                    HTTP_GET, _no_content);
+    server.on("/robots.txt",                       HTTP_GET, _no_content);
+
+    // Catch-all: redirect unknown paths to dashboard in AP mode
+    server.onNotFound(_handle_captive_redirect);
 
     server.begin();
     Serial.println("[WEB] HTTP server started on port 80.");

@@ -20,8 +20,8 @@
  * - Discreet site-footer signature.
  *
  * @author      Doodz (DoodzProg)
- * @date        2026-04-04
- * @version     1.0.0
+ * @date        2026-04-09
+ * @version     1.1.0
  * @repository  https://github.com/DoodzProg/ESP32-BMS-Gateway-Multi-Protocol
  */
 
@@ -119,6 +119,38 @@ body {
 /* ==============================================================================
    TOP NAVIGATION BAR
    ============================================================================== */
+
+/* ==============================================================================
+   PASSWORD CHANGE BANNER
+   Shown when the default password (admin1234) is still active.
+   ISA 101: amber = warning state.
+   ============================================================================== */
+.pwd-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: var(--color-temp);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 7px 16px;
+    text-align: center;
+}
+.pwd-banner svg { flex-shrink: 0; }
+.pwd-banner button {
+    background: rgba(255,255,255,0.25);
+    border: 1px solid rgba(255,255,255,0.5);
+    color: #fff;
+    border-radius: 4px;
+    padding: 2px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.pwd-banner button:hover { background: rgba(255,255,255,0.4); }
 
 .top-bar {
     border-bottom: 1px solid var(--border-color);
@@ -545,39 +577,36 @@ body {
     overflow: hidden;
 }
 
-/* Card header: point name + protocol badges */
+/* Card header: badges on line 1, point name on line 2 */
 .card-header {
     display: flex;
-    align-items: flex-start;
-    gap: 6px;
+    flex-direction: column;
+    gap: 4px;
     margin-bottom: 10px;
     min-width: 0;
     overflow: hidden;
 }
 
-/* Point name label */
-.card-label {
-    font-size: 15px; /* Agrandissement Label Point (TempSetPoint) */
-    color: var(--text-main);
-    text-transform: uppercase;
-    font-weight: 700;
-    letter-spacing: 0.6px;
-    flex: 1 1 0;
-    min-width: 0;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-}
-
-/* Badge cluster (protocol + R/O) — never grows, wraps if needed */
+/* Badge cluster (protocol + R/O) — line 1, left-aligned */
 .card-meta {
     display: flex;
     align-items: center;
     gap: 3px;
-    flex-shrink: 0;
     flex-wrap: wrap;
-    justify-content: flex-end;
-    max-width: 55%;         /* Hard cap to avoid pushing the label off-screen */
+    justify-content: flex-start;
+}
+
+/* Point name label — line 2, full width, preserves original casing */
+.card-label {
+    font-size: 15px;
+    color: var(--text-main);
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 
 /* Protocol + read-only badges */
@@ -937,11 +966,62 @@ body {
 }
 .net-form-panel.visible { display: flex; }
 
+/* Network modal — Tab navigation */
+.net-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 18px;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.net-tab {
+    flex: 1;
+    padding: 10px 6px 10px;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    background: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    transition: color 0.15s, border-color 0.15s;
+    line-height: 1.3;
+    text-align: center;
+}
+.net-tab:hover { color: var(--text-main); }
+.net-tab.active {
+    color: var(--color-bar);
+    border-bottom-color: var(--color-bar);
+}
+.net-tab svg { opacity: 0.55; flex-shrink: 0; }
+.net-tab.active svg { opacity: 1; }
+
+.net-tab-sub {
+    font-size: 9px;
+    opacity: 0.6;
+    font-weight: 400;
+    letter-spacing: 0;
+}
+
+/* Tab content panels */
+.net-tab-panel {
+    display: none;
+    flex-direction: column;
+    gap: 0;
+}
+.net-tab-panel.visible { display: flex; }
+
 .net-warning {
     color: var(--color-temp);
     font-size: 13px;             /* Agrandissement texte warning */
     font-weight: 600;
-    margin-top: 14px;
+    margin-top: 4px;
     display: flex;
     align-items: flex-start;
     gap: 8px;

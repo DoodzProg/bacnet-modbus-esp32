@@ -21,8 +21,8 @@
  *              front-end (rendering, UI state, styles).
  *
  * @author      Doodz (DoodzProg)
- * @date        2026-04-04
- * @version     1.0.1
+ * @date        2026-04-09
+ * @version     1.1.0
  * @repository  https://github.com/DoodzProg/ESP32-BMS-Gateway-Multi-Protocol
  */
 
@@ -218,10 +218,11 @@ function loadSystemInfo() {
             const btn     = document.getElementById('networkBtn');
             const btnText = document.getElementById('networkBtnText');
             btn.style.display = 'flex';
-            // Label reflects current mode so the action is self-explanatory.
-            btnText.innerText = data.isAP
-                ? 'Connect to Enterprise Wi-Fi'
-                : 'Isolate Device (Local AP)';
+            btnText.innerText = 'Network';
+
+            // Show password banner if default credentials are still active
+            const banner = document.getElementById('pwdBanner');
+            if (banner) banner.style.display = data.defaultPwdActive ? 'flex' : 'none';
         })
         .catch(err => console.error('[SYS] Failed to fetch system info:', err));
 }
@@ -417,11 +418,11 @@ function buildCardEl(def, type) {
     // Config and Delete buttons use SVG icons — no emojis.
     el.innerHTML = `
         <div class="card-header">
-            <div class="card-label" title="${escAttr(def.name)}">${escHtml(def.name)}</div>
             <div class="card-meta">
                 ${protoBadges}
                 ${accessBadge}
             </div>
+            <div class="card-label" title="${escAttr(def.name)}">${escHtml(def.name)}</div>
         </div>
         <div class="value-display" id="vdisp-${escAttr(def.name)}">
             <div class="value-wrapper">
@@ -1176,30 +1177,33 @@ function suggestNextBacInst(type) {
 
 /**
  * @brief Opens the network configuration modal.
- *        The modal always presents both modes (STA and AP) as distinct
- *        panels, regardless of the current device state.  The panel
- *        matching the current mode is pre-selected.
+ *        Three tabs: Identity & Security (default), STA, AP.
+ *        The footer confirm button appears only for network tabs.
  */
 function openNetModal() {
     const title   = document.getElementById('netModalTitle');
     const body    = document.getElementById('netModalBody');
-    const actions = document.getElementById('netModalActions');
     const confirm = document.getElementById('netModalConfirmBtn');
 
     title.innerText       = 'Network Configuration';
-    actions.style.display = '';
-
-    // Current mode determines which panel is pre-selected.
-    const currentMode = sysData.isAP ? 'ap' : 'sta';
+    confirm.style.display = 'none';  // Hidden until a network tab is selected
+    confirm.onclick       = null;
 
     body.innerHTML = `
-        <!-- Mode selector — two clearly-labelled choices -->
-        <div class="net-mode-selector">
-            <button id="netBtnSta"
-                    class="net-mode-btn ${currentMode === 'sta' ? 'active' : ''}"
-                    onclick="_netSelectMode('sta')">
-                <!-- Enterprise Wi-Fi icon -->
-                <svg viewBox="0 0 24 24" width="22" height="22"
+        <!-- Tab bar -->
+        <div class="net-tabs">
+            <button id="netTab-identity" class="net-tab active"
+                    onclick="_netTabSelect('identity')">
+                <svg viewBox="0 0 24 24" width="15" height="15"
+                     stroke="currentColor" stroke-width="2" fill="none">
+                    <rect x="3" y="11" width="18" height="11" rx="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+                Identity &amp; Security
+            </button>
+            <button id="netTab-sta" class="net-tab"
+                    onclick="_netTabSelect('sta')">
+                <svg viewBox="0 0 24 24" width="15" height="15"
                      stroke="currentColor" stroke-width="2" fill="none">
                     <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
                     <path d="M1.42 9a16 16 0 0 1 21.16 0"/>
@@ -1207,13 +1211,11 @@ function openNetModal() {
                     <line x1="12" y1="20" x2="12.01" y2="20"/>
                 </svg>
                 Join Existing Network
-                <span style="font-size:9px;opacity:0.7;">Station (STA) mode</span>
+                <span class="net-tab-sub">Station (STA)</span>
             </button>
-            <button id="netBtnAp"
-                    class="net-mode-btn ${currentMode === 'ap' ? 'active' : ''}"
-                    onclick="_netSelectMode('ap')">
-                <!-- Access-point / hotspot icon -->
-                <svg viewBox="0 0 24 24" width="22" height="22"
+            <button id="netTab-ap" class="net-tab"
+                    onclick="_netTabSelect('ap')">
+                <svg viewBox="0 0 24 24" width="15" height="15"
                      stroke="currentColor" stroke-width="2" fill="none">
                     <circle cx="12" cy="12" r="3"/>
                     <path d="M6.3 6.3a8 8 0 0 0 0 11.31"/>
@@ -1222,24 +1224,52 @@ function openNetModal() {
                     <path d="M20.5 3.5a12 12 0 0 1 0 16.97"/>
                 </svg>
                 Create Isolated Network
-                <span style="font-size:9px;opacity:0.7;">Access Point (AP) mode</span>
+                <span class="net-tab-sub">Access Point (AP)</span>
             </button>
         </div>
 
-        <!-- STA panel -->
-        <div id="netPanelSta"
-             class="net-form-panel ${currentMode === 'sta' ? 'visible' : ''}">
+        <!-- Panel: Identity & Security (default) -->
+        <div id="netPanel-identity" class="net-tab-panel visible">
+            <div class="form-group">
+                <label class="form-label">DEVICE NAME</label>
+                <label class="form-label" style="font-size:10px;opacity:0.6;margin-top:2px;">
+                    Sets mDNS hostname: bms-&lt;name&gt;.local
+                </label>
+                <div class="input-row" style="margin-top:4px;">
+                    <input type="text" id="deviceNameInput" class="input-field"
+                           placeholder="e.g. hvac-ahu-01"
+                           value="${escAttr(sysData.deviceName || '')}">
+                    <button class="btn btn-action" onclick="saveDeviceName()">Apply</button>
+                </div>
+            </div>
+            <div class="form-group" style="margin-top:14px;">
+                <label class="form-label">CHANGE PASSWORD</label>
+                <input type="password" id="secCurrent" class="input-field"
+                       placeholder="Current password"
+                       style="margin-top:4px;margin-bottom:6px;">
+                <input type="password" id="secNew" class="input-field"
+                       placeholder="New password (min. 8 characters)"
+                       style="margin-bottom:6px;">
+                <input type="password" id="secConfirm" class="input-field"
+                       placeholder="Confirm new password">
+                <div id="secMsg" style="font-size:11px;min-height:16px;margin-top:4px;"></div>
+                <button class="btn btn-confirm" style="margin-top:8px;width:100%;"
+                        onclick="savePassword()">Change Password</button>
+            </div>
+        </div>
+
+        <!-- Panel: Join Existing Network (STA) -->
+        <div id="netPanel-sta" class="net-tab-panel">
             <div class="form-group">
                 <label class="form-label">WI-FI NETWORK (SSID)</label>
-                <div class="input-row" style="margin-top:0;">
+                <div class="input-row" style="margin-top:4px;">
                     <select id="wifiSelect" class="input-field">
                         <option value="${escAttr(sysData.staSSID || '')}">
                             ${escHtml(sysData.staSSID || 'Select a network…')}
-                            ${sysData.staSSID ? '(Current)' : ''}
+                            ${sysData.staSSID ? ' (Current)' : ''}
                         </option>
                     </select>
                     <button class="btn btn-action" onclick="scanWifi(this)">
-                        <!-- Refresh icon -->
                         <svg viewBox="0 0 24 24" width="12" height="12"
                              stroke="currentColor" stroke-width="2" fill="none">
                             <polyline points="23 4 23 10 17 10"/>
@@ -1249,69 +1279,68 @@ function openNetModal() {
                     </button>
                 </div>
             </div>
-            <div class="form-group">
+            <div class="form-group" style="margin-top:10px;">
                 <label class="form-label">PASSWORD</label>
                 <input type="password" id="wifiPass" class="input-field"
-                       placeholder="Wi-Fi password"
+                       placeholder="Wi-Fi password" style="margin-top:4px;"
                        value="${escAttr(sysData.staPASS || '')}">
             </div>
             <div class="net-warning">
                 ${ICON_WARN}
-                You will be disconnected from the device's local Wi-Fi network.
-                Reconnect to your enterprise network to regain access.
+                You will be disconnected. Reconnect to your enterprise network to regain access.
             </div>
         </div>
 
-        <!-- AP panel -->
-        <div id="netPanelAp"
-             class="net-form-panel ${currentMode === 'ap' ? 'visible' : ''}">
+        <!-- Panel: Create Isolated Network (AP) -->
+        <div id="netPanel-ap" class="net-tab-panel">
             <div class="form-group">
                 <label class="form-label">ACCESS POINT SSID</label>
                 <input type="text" id="apSsidInput" class="input-field"
-                       value="${escAttr(sysData.apSSID || 'BMS-Gateway')}">
+                       style="margin-top:4px;"
+                       value="${escAttr(sysData.apSSID || 'BMS-Gateway-Config')}">
             </div>
-            <div class="form-group">
+            <div class="form-group" style="margin-top:10px;">
                 <label class="form-label">ACCESS POINT PASSWORD</label>
                 <input type="text" id="apPassInput" class="input-field"
+                       style="margin-top:4px;"
                        value="${escAttr(sysData.apPASS || '')}">
             </div>
             <div class="net-warning">
                 ${ICON_WARN}
                 The device will create its own Wi-Fi network.
-                You will need to connect to that network manually after applying.
+                Connect to it manually after applying.
             </div>
         </div>
     `;
-
-    // Wire the confirm button to the currently-selected mode.
-    confirm.onclick = () => saveAndSwitch(_netActiveMode());
 
     document.getElementById('netModal').classList.add('open');
 }
 
 /**
- * @brief Switches the network modal to display the selected mode panel.
+ * @brief Switches the active tab in the network configuration modal.
+ *        Shows/hides the footer confirm button for network tabs only.
  *
- * @param {'sta'|'ap'} mode
+ * @param {'identity'|'sta'|'ap'} tab
  */
-function _netSelectMode(mode) {
-    document.getElementById('netBtnSta').classList.toggle('active', mode === 'sta');
-    document.getElementById('netBtnAp').classList.toggle('active',  mode === 'ap');
-    document.getElementById('netPanelSta').classList.toggle('visible', mode === 'sta');
-    document.getElementById('netPanelAp').classList.toggle('visible',  mode === 'ap');
+function _netTabSelect(tab) {
+    ['identity', 'sta', 'ap'].forEach(t => {
+        document.getElementById(`netTab-${t}`).classList.toggle('active', t === tab);
+        document.getElementById(`netPanel-${t}`).classList.toggle('visible', t === tab);
+    });
 
-    // Re-wire the confirm button.
-    document.getElementById('netModalConfirmBtn').onclick = () => saveAndSwitch(mode);
-}
-
-/**
- * @brief Returns the currently-active network mode based on button state.
- * @returns {'sta'|'ap'}
- */
-function _netActiveMode() {
-    return document.getElementById('netBtnSta').classList.contains('active')
-        ? 'sta'
-        : 'ap';
+    const confirm = document.getElementById('netModalConfirmBtn');
+    if (tab === 'identity') {
+        confirm.style.display = 'none';
+        confirm.onclick = null;
+    } else if (tab === 'sta') {
+        confirm.style.display = '';
+        confirm.innerText = 'Apply & Reboot (STA)';
+        confirm.onclick = () => saveAndSwitch('sta');
+    } else {
+        confirm.style.display = '';
+        confirm.innerText = 'Apply & Reboot (AP)';
+        confirm.onclick = () => saveAndSwitch('ap');
+    }
 }
 
 /** @brief Closes the network configuration modal. */
@@ -1363,30 +1392,41 @@ function scanWifi(btn) {
 }
 
 /**
- * @brief Builds the switch-network request URL and sends it; shows a
- *        rebooting message in the modal while the device restarts.
+ * @brief Persists new network credentials via POST JSON and triggers a reboot.
+ *        Credentials are sent in the request body — never in URL query strings.
  *
- * @param {'wifi'|'local'} mode  - 'wifi' maps to STA; 'local' maps to AP.
- *                                  Note: this parameter naming is unchanged
- *                                  from the original to preserve the API.
+ * @param {'sta'|'ap'} mode
  */
 function saveAndSwitch(mode) {
-    // Translate internal mode names to API parameters (unchanged API contract).
-    let apiMode = mode;
-    if (mode === 'sta') apiMode = 'wifi';
-    if (mode === 'ap')  apiMode = 'local';
+    let body;
+    let reconnectHint;
 
-    let url = `/api/switch_network?mode=${apiMode}`;
-
-    if (apiMode === 'wifi') {
+    if (mode === 'sta') {
         const ssid = document.getElementById('wifiSelect')?.value || '';
         const pass = document.getElementById('wifiPass')?.value   || '';
-        url += `&ssid=${encodeURIComponent(ssid)}&pass=${encodeURIComponent(pass)}`;
+        body = { mode: 'wifi', ssid, pass };
+
+        // Build the link the user will use after reconnecting to the enterprise network
+        const mdns = sysData.deviceName
+            ? `http://bms-${sysData.deviceName.toLowerCase()}.local`
+            : `http://${sysData.espIP}`;
+        reconnectHint = `
+            Reconnect to your enterprise network, then access the device at:<br>
+            <a href="${mdns}" target="_blank"
+               style="color:var(--color-bar);text-decoration:underline;">${mdns}</a>`;
     } else {
         const apSsid = document.getElementById('apSsidInput')?.value || '';
         const apPass = document.getElementById('apPassInput')?.value  || '';
-        url += `&ap_ssid=${encodeURIComponent(apSsid)}`;
-        url += `&ap_pass=${encodeURIComponent(apPass)}`;
+        body = { mode: 'local', ap_ssid: apSsid, ap_pass: apPass };
+
+        const apMdns = sysData.deviceName
+            ? `http://bms-${sysData.deviceName.toLowerCase()}.local`
+            : 'http://192.168.4.1';
+        reconnectHint = `
+            Connect to the Wi-Fi network <strong>${apSsid || 'BMS-Gateway-Config'}</strong>,
+            then access the device at:<br>
+            <a href="${apMdns}" target="_blank"
+               style="color:var(--color-bar);text-decoration:underline;">${apMdns}</a>`;
     }
 
     document.getElementById('netModalBody').innerHTML = `
@@ -1394,15 +1434,107 @@ function saveAndSwitch(mode) {
             <p style="font-size:14px;font-weight:700;color:var(--color-temp);">
                 Applying network configuration…
             </p>
-            <p style="font-size:12px;margin-top:8px;">
-                The device is rebooting. Please wait, then reconnect
-                to the correct network if necessary.
+            <p style="font-size:12px;margin-top:10px;line-height:1.7;">
+                ${reconnectHint}
             </p>
         </div>`;
     document.getElementById('netModalActions').style.display = 'none';
 
-    fetch(url).finally(() => {
+    fetch('/api/switch_network', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(body)
+    }).finally(() => {
         setTimeout(() => window.location.reload(), 12000);
+    });
+}
+
+// ==============================================================================
+// DEVICE IDENTITY & SECURITY
+// ==============================================================================
+
+/**
+ * @brief Sends the new device name to /api/device/name and triggers a reboot.
+ */
+function saveDeviceName() {
+    const name = (document.getElementById('deviceNameInput')?.value || '').trim();
+    if (!name) { alert('Device name cannot be empty.'); return; }
+    if (name.length > 32) { alert('Device name must be 32 characters or fewer.'); return; }
+
+    fetch('/api/device/name', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+    })
+    .then(r => r.json())
+    .then(() => {
+        document.getElementById('netModalBody').innerHTML = `
+            <div style="text-align:center;padding:24px 0;">
+                <p style="font-size:14px;font-weight:700;color:var(--color-temp);">
+                    Device name saved. Rebooting…
+                </p>
+                <p style="font-size:12px;margin-top:8px;">
+                    The device will be available at
+                    <a href="http://bms-${name.toLowerCase()}.local"
+                       target="_blank"
+                       style="color:var(--color-bar);text-decoration:underline;">
+                        http://bms-${name.toLowerCase()}.local
+                    </a> after reboot.
+                </p>
+            </div>`;
+        document.getElementById('netModalActions').style.display = 'none';
+        setTimeout(() => window.location.reload(), 12000);
+    })
+    .catch(() => alert('Failed to save device name.'));
+}
+
+/**
+ * @brief Validates and submits a password change to /api/auth/change.
+ */
+function savePassword() {
+    const current = document.getElementById('secCurrent')?.value  || '';
+    const next    = document.getElementById('secNew')?.value      || '';
+    const confirm = document.getElementById('secConfirm')?.value  || '';
+    const msg     = document.getElementById('secMsg');
+
+    if (!current || !next || !confirm) {
+        msg.style.color = 'var(--color-temp)';
+        msg.innerText = 'All three fields are required.'; return;
+    }
+    if (next.length < 8) {
+        msg.style.color = 'var(--color-temp)';
+        msg.innerText = 'New password must be at least 8 characters.'; return;
+    }
+    if (next !== confirm) {
+        msg.style.color = 'var(--color-temp)';
+        msg.innerText = 'New password and confirmation do not match.'; return;
+    }
+
+    fetch('/api/auth/change', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword: current, newPassword: next })
+    })
+    .then(r => {
+        if (r.status === 403) throw new Error('incorrect');
+        if (!r.ok)            throw new Error('server');
+        return r.json();
+    })
+    .then(() => {
+        msg.style.color = 'var(--color-run)';
+        msg.innerText = 'Password changed successfully.';
+        document.getElementById('secCurrent').value = '';
+        document.getElementById('secNew').value     = '';
+        document.getElementById('secConfirm').value = '';
+        // Hide the warning banner
+        const banner = document.getElementById('pwdBanner');
+        if (banner) banner.style.display = 'none';
+    })
+    .catch(e => {
+        msg.style.color = 'var(--color-temp)';
+        msg.innerText = e.message === 'incorrect'
+            ? 'Current password is incorrect.'
+            : 'Server error — try again.';
     });
 }
 

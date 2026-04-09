@@ -27,6 +27,16 @@
 //   - Not used in v1.0.1.
 
 // ==============================================================================
+// DEFAULT IDENTITY & CREDENTIALS
+// ==============================================================================
+// These values are used on first boot (nothing stored in NVS yet).
+// All of them can be changed at runtime via the web UI without reflashing.
+
+#define DEFAULT_DEVICE_NAME ""          // Empty = use "bms-gateway.local" (legacy behaviour)
+#define DEFAULT_WEB_USER    "admin"
+#define DEFAULT_WEB_PASS    "admin1234"
+
+// ==============================================================================
 // NETWORK & BACNET CONFIGURATION
 // ==============================================================================
 

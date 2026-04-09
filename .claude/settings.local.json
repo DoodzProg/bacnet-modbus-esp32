@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir \"C:\\\\Users\\\\Doodz\\\\Documents\\\\PlatformIO\\\\Projects\\\\ESP32-BMS-Gateway-Multi-Protocol\\\\docs\" /B)"
+    ]
+  }
+}

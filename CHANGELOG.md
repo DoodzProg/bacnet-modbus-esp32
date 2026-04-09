@@ -11,6 +11,42 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.1.0] — 2026-04-09
+
+### Added
+- **mDNS hostname customization** — device accessible at `http://bms-<name>.local`; name set via web UI, persisted in NVRAM.
+- **Persistent custom AP SSID** — user-supplied AP network name stored in NVRAM and respected on every reboot (previously always overridden by device name).
+- **HTTP Basic Authentication** — SHA-256 password hash stored in NVRAM (`bms-auth` namespace); default-password banner displayed on dashboard until credentials are changed.
+- **Network Configuration modal — 3-tab redesign:**
+  - *Identity & Security* tab: device name + password change (default panel).
+  - *Join Existing Network* tab: STA credentials + Wi-Fi scan.
+  - *Create Isolated Network* tab: AP SSID + password.
+  - Each network tab exposes its own "Apply & Reboot" button in the modal footer.
+- **Clickable post-reboot links** — mDNS URL (STA mode) and mDNS URL (AP mode) rendered as blue hyperlinks in all reboot confirmation messages.
+- **Browser probe silencers** — explicit 204 handlers for `/favicon.ico`, `/apple-touch-icon.png`, `/apple-touch-icon-precomposed.png`, `/manifest.json`, `/robots.txt`; eliminates spurious `_handleRequest(): request handler not found` log lines caused by the Arduino WebServer library.
+- **`POST /api/device/name`** — sets device name (mDNS hostname + default AP SSID prefix); triggers safe reboot.
+- **`POST /api/auth/change`** — updates web UI password; verifies current password before accepting new one.
+
+### Changed
+- **`/api/switch_network` promoted to POST with JSON body** — Wi-Fi credentials are no longer exposed as URL query parameters (no longer visible in server logs, browser history, or proxy traces).
+- **`handleSystem()` refactored** — single NVS read block for all `bms-app` keys; eliminated redundant double-open and duplicate JSON build that remained from an earlier refactor.
+- **`bms-auth` NVS namespace opened read-write throughout** — `_check_auth()` and `handleSystem()` no longer open `bms-auth` read-only; namespace is auto-created on first boot, eliminating the `nvs_open failed: NOT_FOUND` log spam.
+- **Dashboard point cards redesigned:**
+  - Protocol badges (`MB Reg:xxx`, `BN AV:xxx`) moved to **line 1** (top of card, left-aligned).
+  - Point name moved to **line 2** (full card width, `text-overflow: ellipsis`, case preserved — no forced uppercase).
+- **Network button** label simplified to **"Network"** (was context-sensitive: "Isolate Device (Local AP)" / "Connect to Enterprise Wi-Fi").
+- **Modal close button** relabeled **"Close"** (was "Cancel").
+- **`_handle_captive_redirect()`** returns 204 No Content in STA mode (was 404 Not Found).
+
+### Fixed
+- **AP SSID bug** — device always derived the AP SSID from the device name, ignoring the SSID typed by the user in the modal. `main.cpp` now reads `ap_ssid` from NVRAM and applies it with correct priority over the derived fallback.
+- **NVS log spam** — `nvs_open failed: NOT_FOUND` printed to serial on every API poll when `bms-auth` namespace did not yet exist (first boot or before first password change).
+
+### Security
+- Wi-Fi and AP credentials now sent exclusively via POST request body (JSON) — never as URL query parameters.
+
+---
+
 ## [1.0.1] — 2026-04-08
 
 ### Added
@@ -87,7 +123,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - JSON configuration persistence to `/config.json` on LittleFS.
 - Safe Reboot mechanism via `pendingReboot` flag to prevent watchdog crashes during web-triggered restarts.
 
-[Unreleased]: https://github.com/DoodzProg/ESP32-BMS-Gateway-Multi-Protocol/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/DoodzProg/ESP32-BMS-Gateway-Multi-Protocol/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/DoodzProg/ESP32-BMS-Gateway-Multi-Protocol/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/DoodzProg/ESP32-BMS-Gateway-Multi-Protocol/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/DoodzProg/ESP32-BMS-Gateway-Multi-Protocol/compare/v0.3.0...v1.0.0
 [0.3.0]: https://github.com/DoodzProg/ESP32-BMS-Gateway-Multi-Protocol/compare/v0.2.0...v0.3.0
