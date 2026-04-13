@@ -13,3 +13,6 @@ include/secrets.h
 # Fichiers d'installation WEB
 !docs/*.bin
 !docs/*.json
+
+# Dossiers de données et de cache IA 
+.claude/
